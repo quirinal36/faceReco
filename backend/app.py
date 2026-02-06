@@ -54,8 +54,17 @@ def main():
 
         elif args.mode == 'server':
             print("\n[API 서버 모드]")
-            print("API 서버 기능은 아직 구현되지 않았습니다.")
-            print("Milestone 4에서 구현 예정")
+            print("FastAPI 서버를 시작합니다...")
+            print("=" * 50)
+
+            # server.py의 main 함수 호출
+            try:
+                from server import main as server_main
+                server_main()
+            except ImportError as e:
+                print(f"서버 모듈 로드 실패: {str(e)}")
+                print("필요한 패키지를 설치하세요: pip install fastapi uvicorn")
+                sys.exit(1)
 
     except KeyboardInterrupt:
         print("\n프로그램을 종료합니다.")

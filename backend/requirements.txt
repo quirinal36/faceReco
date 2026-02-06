@@ -1,31 +1,30 @@
-# 기본 의존성 패키지
-# Python 3.9+ 필요
+# Basic dependencies
+# Python 3.7+ required
 
-# 컴퓨터 비전
+# Computer vision
 opencv-python>=4.8.0
 
-# 머신러닝
+# Machine learning
 transformers>=4.35.0
 torch>=2.1.0
 
-# 웹 프레임워크 (하나 선택)
-# flask>=3.0.0
+# Web framework
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 
-# 유틸리티
+# Utilities
 numpy>=1.24.0
 pillow>=10.0.0
 python-multipart>=0.0.6
 
-# 개발 도구
+# Development tools
 pytest>=7.4.0
 black>=23.10.0
 
-# 얼굴 인식 (InsightFace)
+# Face recognition (InsightFace)
 insightface>=0.7.3
-onnxruntime>=1.16.0         # CPU 지원
-scikit-learn>=1.3.0         # cosine_similarity 계산용
+onnxruntime>=1.16.0
+scikit-learn>=1.3.0
 
-# GPU 지원 (선택사항, 필요시 아래 주석 해제)
+# GPU support (optional)
 # onnxruntime-gpu>=1.16.0
