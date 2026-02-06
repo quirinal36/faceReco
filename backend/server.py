@@ -18,26 +18,26 @@ from api.routes import router, cleanup_resources
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    애플리케이션 라이프사이클 관리
+    Application lifecycle management
 
-    시작 시: 리소스 초기화
-    종료 시: 리소스 정리
+    Startup: Initialize resources
+    Shutdown: Cleanup resources
     """
-    # 시작
+    # Startup
     print("=" * 60)
-    print("얼굴 인식 API 서버 시작 중...")
+    print("Starting Face Recognition API Server...")
     print("=" * 60)
 
-    # 초기 로드 (의존성이 자동으로 초기화됨)
-    print("✓ API 라우트 로드 완료")
+    # Initial load (dependencies will be initialized automatically)
+    print("API routes loaded successfully")
 
     yield
 
-    # 종료
+    # Shutdown
     print("\n" + "=" * 60)
-    print("서버 종료 중...")
+    print("Shutting down server...")
     cleanup_resources()
-    print("✓ 리소스 정리 완료")
+    print("Resources cleaned up successfully")
     print("=" * 60)
 
 
@@ -110,13 +110,13 @@ def main():
     개발 모드로 Uvicorn 서버 시작
     """
     print("\n" + "=" * 60)
-    print("🚀 FastAPI 서버를 시작합니다...")
+    print("Starting FastAPI server...")
     print("=" * 60)
-    print("📡 서버 주소: http://localhost:8000")
-    print("📚 API 문서: http://localhost:8000/docs")
-    print("📖 ReDoc: http://localhost:8000/redoc")
+    print("Server URL: http://localhost:8000")
+    print("API Documentation: http://localhost:8000/docs")
+    print("ReDoc: http://localhost:8000/redoc")
     print("=" * 60)
-    print("\n종료하려면 Ctrl+C를 누르세요.\n")
+    print("\nPress Ctrl+C to stop the server.\n")
 
     uvicorn.run(
         "server:app",

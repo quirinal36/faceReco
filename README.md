@@ -21,6 +21,8 @@
 - [PRD (제품 요구사항)](./PRD.md)
 - [프로젝트 계획서](./PROJECT_PLAN.md)
 - [학습 워크북 (Learning Workbook)](./LEARNING_WORKBOOK.md) - 프로젝트 관리자를 위한 기술 학습 가이드
+- [API 가이드](./API_GUIDE.md) - FastAPI 서버 사용 방법
+- [트러블슈팅 가이드](./TROUBLESHOOTING.md) - 설치 및 실행 문제 해결
 
 ## 프로젝트 구조
 ```
@@ -47,7 +49,7 @@ faceReco/
 ```
 
 ## 프로젝트 상태
-현재 상태: **Milestone 3 - ML 모델 통합 완료** ✅
+현재 상태: **Milestone 4 - Backend API 개발 완료** ✅
 
 ### 완료된 작업
 **Milestone 1: 프로젝트 초기 설정** ✅
@@ -72,9 +74,17 @@ faceReco/
 - [x] 얼굴 인식 및 매칭 기능 구현
 - [x] 단위 테스트 작성
 
+**Milestone 4: Backend API 개발** ✅
+- [x] FastAPI 프로젝트 초기화
+- [x] API 엔드포인트 설계 및 구현
+- [x] CORS 설정
+- [x] 실시간 비디오 스트리밍 API
+- [x] 얼굴 등록/조회/삭제 API
+- [x] API 문서 작성 (Swagger UI)
+
 ### 다음 단계
-- [ ] Backend API 개발 (Milestone 4)
 - [ ] 웹 대시보드 개발 (Milestone 5)
+- [ ] 통합 및 배포 준비 (Milestone 6)
 
 ## 시작하기
 
@@ -106,8 +116,13 @@ faceReco/
 3. **의존성 패키지 설치**
    ```bash
    # 기본 패키지 설치
-   pip install -r backend/requirements.txt
+   cd backend
+   pip install -r requirements.txt
    ```
+
+   **중요**: Windows에서 InsightFace 설치 문제가 발생할 수 있습니다.
+   - **권장 해결책**: [트러블슈팅 가이드](./TROUBLESHOOTING.md)의 해결책 1 또는 2 참고
+   - Visual Studio Build Tools 설치 또는 Conda 환경 사용
 
    **참고**: 첫 실행 시 InsightFace buffalo_l 모델이 자동으로 다운로드됩니다 (~600MB)
 
@@ -147,7 +162,29 @@ python app.py --mode face_detection --camera-id 0
 python app.py --mode camera --camera-id 0
 ```
 
-#### 5. 개별 모듈 실행
+#### 5. API 서버 실행 (FastAPI) 🆕
+```bash
+# 방법 1: app.py 사용
+python app.py --mode server
+
+# 방법 2: server.py 직접 실행
+python server.py
+```
+
+서버 시작 후:
+- **API 문서**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/api/health
+
+**API 엔드포인트**:
+- `POST /api/face/register` - 얼굴 등록
+- `GET /api/faces/list` - 등록된 얼굴 목록
+- `DELETE /api/face/{id}` - 얼굴 삭제
+- `GET /api/camera/stream` - 실시간 비디오 스트리밍
+
+자세한 사용 방법은 [API 가이드](./API_GUIDE.md)를 참고하세요.
+
+#### 6. 개별 모듈 실행
 ```bash
 # 카메라 핸들러 테스트
 python -m camera.camera_handler
