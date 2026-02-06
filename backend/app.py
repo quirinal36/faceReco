@@ -8,6 +8,7 @@ import sys
 import argparse
 from camera.camera_handler import CameraHandler, test_camera
 from models.face_detection import FaceDetector, demo_face_detection
+from models.face_recognition import demo_face_registration, demo_face_recognition
 
 
 def main():
@@ -16,9 +17,10 @@ def main():
     parser.add_argument(
         '--mode',
         type=str,
-        choices=['camera', 'face_detection', 'server'],
+        choices=['camera', 'face_detection', 'face_recognition', 'register', 'server'],
         default='face_detection',
-        help='실행 모드 (camera: 카메라 테스트, face_detection: 얼굴 감지 데모, server: API 서버)'
+        help='실행 모드 (camera: 카메라 테스트, face_detection: 얼굴 감지 데모, '
+             'face_recognition: 얼굴 인식, register: 얼굴 등록, server: API 서버)'
     )
     parser.add_argument(
         '--camera-id',
@@ -41,6 +43,14 @@ def main():
         elif args.mode == 'face_detection':
             print("\n[얼굴 감지 데모 모드]")
             demo_face_detection(camera_id=args.camera_id)
+
+        elif args.mode == 'register':
+            print("\n[얼굴 등록 모드]")
+            demo_face_registration(camera_id=args.camera_id)
+
+        elif args.mode == 'face_recognition':
+            print("\n[얼굴 인식 모드]")
+            demo_face_recognition(camera_id=args.camera_id)
 
         elif args.mode == 'server':
             print("\n[API 서버 모드]")

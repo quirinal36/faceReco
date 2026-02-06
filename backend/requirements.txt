@@ -21,3 +21,11 @@ python-multipart>=0.0.6
 # 개발 도구
 pytest>=7.4.0
 black>=23.10.0
+
+# 얼굴 인식 (InsightFace)
+insightface>=0.7.3
+onnxruntime>=1.16.0         # CPU 지원
+scikit-learn>=1.3.0         # cosine_similarity 계산용
+
+# GPU 지원 (선택사항, 필요시 아래 주석 해제)
+# onnxruntime-gpu>=1.16.0

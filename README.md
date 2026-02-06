@@ -20,6 +20,7 @@
 ## 문서
 - [PRD (제품 요구사항)](./PRD.md)
 - [프로젝트 계획서](./PROJECT_PLAN.md)
+- [학습 워크북 (Learning Workbook)](./LEARNING_WORKBOOK.md) - 프로젝트 관리자를 위한 기술 학습 가이드
 
 ## 프로젝트 구조
 ```
@@ -27,8 +28,15 @@ faceReco/
 ├── backend/                # 백엔드 서버
 │   ├── app.py             # 메인 애플리케이션
 │   ├── models/            # ML 모델 모듈
+│   │   ├── face_detection.py      # Haar Cascade 얼굴 감지
+│   │   ├── face_recognition.py    # InsightFace 얼굴 인식
+│   │   └── face_database.py       # 얼굴 데이터베이스 관리
 │   ├── camera/            # 카메라 처리 모듈
 │   ├── api/               # API 엔드포인트
+│   ├── data/              # 얼굴 데이터베이스
+│   │   ├── face_database.json     # 메타데이터
+│   │   ├── embeddings/            # 얼굴 임베딩 (512차원)
+│   │   └── faces/                 # 얼굴 이미지
 │   └── requirements.txt   # Python 의존성
 ├── frontend/              # 프론트엔드 (추후 개발)
 ├── docs/                  # 문서
@@ -39,7 +47,7 @@ faceReco/
 ```
 
 ## 프로젝트 상태
-현재 상태: **Milestone 2 - 카메라 연동 및 얼굴 감지 완료** ✅
+현재 상태: **Milestone 3 - ML 모델 통합 완료** ✅
 
 ### 완료된 작업
 **Milestone 1: 프로젝트 초기 설정** ✅
@@ -56,9 +64,17 @@ faceReco/
 - [x] 얼굴 영역 바운딩 박스 표시
 - [x] 단위 테스트 작성
 
+**Milestone 3: ML 모델 통합** ✅
+- [x] InsightFace buffalo_l 모델 선정
+- [x] FaceRecognizer 클래스 구현 (얼굴 임베딩 추출)
+- [x] FaceDatabase 클래스 구현 (얼굴 데이터베이스 관리)
+- [x] 얼굴 등록 기능 구현
+- [x] 얼굴 인식 및 매칭 기능 구현
+- [x] 단위 테스트 작성
+
 ### 다음 단계
-- [ ] Hugging Face 모델 조사 및 선정 (Milestone 3)
-- [ ] 얼굴 인식 기능 구현 (Milestone 3)
+- [ ] Backend API 개발 (Milestone 4)
+- [ ] 웹 대시보드 개발 (Milestone 5)
 
 ## 시작하기
 
@@ -91,37 +107,56 @@ faceReco/
    ```bash
    # 기본 패키지 설치
    pip install -r backend/requirements.txt
-
-   # ML 모델 패키지 (선택사항, 크기가 큼)
-   # pip install torch transformers
    ```
+
+   **참고**: 첫 실행 시 InsightFace buffalo_l 모델이 자동으로 다운로드됩니다 (~600MB)
 
 ### 실행 방법
 
-#### 1. 얼굴 감지 데모 (기본 모드)
+**가상환경 활성화 필수**:
 ```bash
-# 가상환경이 활성화된 상태에서
+source venv/bin/activate  # Linux/Mac
+# 또는
+venv\Scripts\activate     # Windows
 cd backend
-python app.py
+```
 
-# 또는 명시적으로
+#### 1. 얼굴 등록 (새로운 얼굴 추가)
+```bash
+python app.py --mode register --camera-id 0
+```
+- 스페이스바: 얼굴 캡처
+- 이름 입력 후 엔터
+- q: 종료
+
+#### 2. 얼굴 인식 (실시간 인식)
+```bash
+python app.py --mode face_recognition --camera-id 0
+```
+- 등록된 얼굴: 녹색 박스 + 이름 + 신뢰도
+- 미등록 얼굴: 빨간색 박스 + "Unknown"
+- q: 종료
+
+#### 3. 얼굴 감지 데모 (Haar Cascade)
+```bash
 python app.py --mode face_detection --camera-id 0
 ```
 
-#### 2. 카메라 테스트
+#### 4. 카메라 테스트
 ```bash
-cd backend
 python app.py --mode camera --camera-id 0
 ```
 
-#### 3. 개별 모듈 실행
+#### 5. 개별 모듈 실행
 ```bash
 # 카메라 핸들러 테스트
-cd backend
 python -m camera.camera_handler
 
 # 얼굴 감지 데모
 python -m models.face_detection
+
+# 얼굴 인식 모듈 테스트
+python -m models.face_recognition
 ```
 
 **참고**:
@@ -163,8 +198,8 @@ python -m models.face_detection
 ### 마일스톤
 - **Milestone 1**: 프로젝트 초기 설정 ✅
 - **Milestone 2**: 카메라 연동 및 기본 얼굴 감지 ✅
-- **Milestone 3**: ML 모델 통합 (진행 예정)
-- **Milestone 4**: Backend API 개발
+- **Milestone 3**: ML 모델 통합 ✅
+- **Milestone 4**: Backend API 개발 (진행 예정)
 - **Milestone 5**: 웹 대시보드 개발
 - **Milestone 6**: 통합 및 배포 준비
 
