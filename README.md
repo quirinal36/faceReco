@@ -39,18 +39,26 @@ faceReco/
 ```
 
 ## 프로젝트 상태
-현재 상태: **Milestone 1 - 초기 설정 완료** ✅
+현재 상태: **Milestone 2 - 카메라 연동 및 얼굴 감지 완료** ✅
 
 ### 완료된 작업
+**Milestone 1: 프로젝트 초기 설정** ✅
 - [x] GitHub 리포지토리 생성
 - [x] 프로젝트 디렉토리 구조 생성
 - [x] Python 가상환경 설정
 - [x] 기본 의존성 패키지 설치
 - [x] 문서 작성 (PRD, PROJECT_PLAN, README)
 
+**Milestone 2: 카메라 연동 및 기본 얼굴 감지** ✅
+- [x] OpenCV 카메라 핸들러 구현
+- [x] 실시간 비디오 스트림 처리
+- [x] Haar Cascade 얼굴 감지 구현
+- [x] 얼굴 영역 바운딩 박스 표시
+- [x] 단위 테스트 작성
+
 ### 다음 단계
-- [ ] 카메라 연동 구현 (Milestone 2)
-- [ ] 얼굴 감지 기능 구현 (Milestone 2)
+- [ ] Hugging Face 모델 조사 및 선정 (Milestone 3)
+- [ ] 얼굴 인식 기능 구현 (Milestone 3)
 
 ## 시작하기
 
@@ -90,12 +98,36 @@ faceReco/
 
 ### 실행 방법
 
-현재 개발 초기 단계로 기본 애플리케이션만 실행 가능합니다:
-
+#### 1. 얼굴 감지 데모 (기본 모드)
 ```bash
 # 가상환경이 활성화된 상태에서
-python backend/app.py
+cd backend
+python app.py
+
+# 또는 명시적으로
+python app.py --mode face_detection --camera-id 0
 ```
+
+#### 2. 카메라 테스트
+```bash
+cd backend
+python app.py --mode camera --camera-id 0
+```
+
+#### 3. 개별 모듈 실행
+```bash
+# 카메라 핸들러 테스트
+cd backend
+python -m camera.camera_handler
+
+# 얼굴 감지 데모
+python -m models.face_detection
+```
+
+**참고**:
+- 실행 시 웹캠 접근 권한이 필요합니다
+- 'q' 키를 누르면 프로그램이 종료됩니다
+- WSL 환경에서는 카메라 접근이 제한될 수 있습니다
 
 ### 개발 환경 설정
 
@@ -130,8 +162,8 @@ python backend/app.py
 
 ### 마일스톤
 - **Milestone 1**: 프로젝트 초기 설정 ✅
-- **Milestone 2**: 카메라 연동 및 기본 얼굴 감지
-- **Milestone 3**: ML 모델 통합
+- **Milestone 2**: 카메라 연동 및 기본 얼굴 감지 ✅
+- **Milestone 3**: ML 모델 통합 (진행 예정)
 - **Milestone 4**: Backend API 개발
 - **Milestone 5**: 웹 대시보드 개발
 - **Milestone 6**: 통합 및 배포 준비
