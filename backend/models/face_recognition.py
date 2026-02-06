@@ -23,7 +23,7 @@ class FaceRecognizer:
 
     def __init__(
         self,
-        model_name: str = 'buffalo_l',
+        model_name: Optional[str] = None,
         device: str = 'auto',
         det_size: Tuple[int, int] = (640, 640)
     ):
@@ -31,11 +31,11 @@ class FaceRecognizer:
         얼굴 인식기 초기화
 
         Args:
-            model_name (str): InsightFace 모델 이름 (buffalo_l, buffalo_m, buffalo_s)
+            model_name (Optional[str]): InsightFace 모델 이름 (최신 버전에서만 사용, 구버전은 None)
             device (str): 실행 디바이스 ('auto', 'cuda', 'cpu')
             det_size (Tuple[int, int]): 얼굴 감지 입력 크기
         """
-        self.model_name = model_name
+        self.model_name = model_name or 'default'
         self.det_size = det_size
 
         # InsightFace import (지연 로딩)
@@ -68,15 +68,39 @@ class FaceRecognizer:
             ctx_id = -1
             self.device = 'cpu'
 
-        print(f"얼굴 인식 초기화 중... (모델: {model_name}, 디바이스: {self.device})")
+        print(f"얼굴 인식 초기화 중... (모델: {self.model_name}, 디바이스: {self.device})")
 
         # InsightFace 모델 로드
         try:
-            self.app = FaceAnalysis(name=model_name)
+            # InsightFace 0.2.1 (구버전)과의 호환성 처리
+            import insightface
+            version = getattr(insightface, '__version__', '0.2.1')
+
+            if version.startswith('0.2'):
+                # 구버전: retinaface와 arcface 모델 조합 사용
+                print(f"InsightFace 구버전 감지 (v{version}), retinaface-arcface 모델 사용")
+                # 구버전에서는 빈 문자열 또는 특정 모델명 필요
+                # name='antelopev2'를 시도하거나, 빈 문자열 사용
+                try:
+                    self.app = FaceAnalysis(name='')
+                except:
+                    # 빈 문자열도 안 되면 기본 모델 시도
+                    try:
+                        self.app = FaceAnalysis(name='antelopev2')
+                    except:
+                        # 마지막 시도: retinaface_r50_v1
+                        self.app = FaceAnalysis(name='retinaface_r50_v1')
+            else:
+                # 최신 버전: buffalo 모델 사용
+                if model_name:
+                    self.app = FaceAnalysis(name=model_name)
+                else:
+                    self.app = FaceAnalysis(name='buffalo_l')
+
             self.app.prepare(ctx_id=ctx_id, det_size=det_size)
             print(f"얼굴 인식기 초기화 완료")
 
-            # 임베딩 크기 설정 (buffalo_l은 512차원)
+            # 임베딩 크기 설정 (일반적으로 512차원)
             self.embedding_size = 512
 
         except Exception as e:

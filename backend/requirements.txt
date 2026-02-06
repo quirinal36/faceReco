@@ -1,106 +1,53 @@
-# Face Recognition System Requirements
-# Python 3.8+ required (3.10 recommended)
-
-# ====================
-# Core Dependencies
-# ====================
-
-# Web Framework
-fastapi>=0.104.0,<1.0.0
-uvicorn[standard]>=0.24.0,<1.0.0
-python-multipart>=0.0.6
-
-# Computer Vision
-opencv-python>=4.7.0,<5.0.0
-
-# Numerical Computing
-numpy>=1.24.0,<2.0.0
-scipy>=1.10.0,<2.0.0
-
-# Machine Learning
-scikit-learn>=1.3.0,<2.0.0
-scikit-image>=0.21.0
-
-# ====================
-# Face Recognition
-# ====================
-
-# InsightFace - Face recognition models
-# IMPORTANT: See TROUBLESHOOTING.md for installation issues on Windows
-# Requires C++ compiler (Visual Studio Build Tools) or use Conda
-insightface>=0.7.3
-
-# ONNX Runtime - Model inference engine
-onnxruntime>=1.16.0,<2.0.0
-
-# Supporting libraries for InsightFace
-onnx>=1.14.0
-easydict>=1.9
-tqdm>=4.60.0
-
-# ====================
-# Utilities
-# ====================
-
-# Image processing
-Pillow>=10.0.0
-
-# Data handling
-pydantic>=2.0.0
-
-# Logging (for onnxruntime)
-coloredlogs>=15.0
-sympy>=1.10
-
-# ====================
-# Development Tools
-# ====================
-
-# Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-
-# Code formatting
-black>=23.10.0
-isort>=5.12.0
-
-# Type checking
-mypy>=1.5.0
-
-# ====================
-# Optional: GPU Support
-# ====================
-
-# Uncomment for NVIDIA GPU acceleration
-# Requires CUDA 11.x or 12.x
-# onnxruntime-gpu>=1.16.0
-
-# ====================
-# Optional: Additional ML
-# ====================
-
-# Uncomment if using Hugging Face Transformers
-# transformers>=4.35.0
-# torch>=2.1.0
-
-# ====================
-# Installation Notes
-# ====================
-
-# Windows Users:
-# If InsightFace installation fails, please refer to TROUBLESHOOTING.md
-# Quick solutions:
-#   1. Install Visual Studio Build Tools
-#   2. Use Conda: conda install -c conda-forge insightface
-#   3. Use pre-built wheel from unofficial sources
-
-# Linux Users:
-#   sudo apt-get install build-essential python3-dev
-#   pip install -r requirements.txt
-
-# macOS Users:
-#   xcode-select --install
-#   pip install -r requirements.txt
-
-# Verification:
-# Run: python test_installation.py (see TROUBLESHOOTING.md)
+albucore==0.0.24
+albumentations==2.0.8
+annotated-types==0.7.0
+certifi==2026.1.4
+charset-normalizer==3.4.4
+colorama==0.4.6
+coloredlogs==15.0.1
+contourpy==1.3.2
+cycler==0.12.1
+Cython==3.2.4
+easydict==1.13
+flatbuffers==25.12.19
+fonttools==4.61.1
+humanfriendly==10.0
+idna==3.11
+ImageIO==2.37.2
+insightface==0.7.3
+joblib==1.5.3
+kiwisolver==1.4.9
+lazy_loader==0.4
+matplotlib==3.10.8
+ml_dtypes==0.5.4
+mpmath==1.3.0
+networkx==3.4.2
+numpy==2.2.6
+onnx==1.20.1
+onnxruntime==1.23.2
+opencv-python-headless==4.13.0.92
+packaging==26.0
+pillow==12.1.0
+prettytable==3.17.0
+protobuf==6.33.5
+pydantic==2.12.5
+pydantic_core==2.41.5
+pyparsing==3.3.2
+pyreadline3==3.5.4
+python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+requests==2.32.5
+scikit-image==0.25.2
+scikit-learn==1.7.2
+scipy==1.15.3
+simsimd==6.5.12
+six==1.17.0
+stringzilla==4.6.0
+sympy==1.14.0
+threadpoolctl==3.6.0
+tifffile==2025.5.10
+tqdm==4.67.3
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+urllib3==2.6.3
+wcwidth==0.5.3

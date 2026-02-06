@@ -49,7 +49,7 @@ class FaceDatabase:
         self.faces = {}
         self.config = {
             'threshold': threshold,
-            'model_name': 'buffalo_l',
+            'model_name': 'default',
             'embedding_size': 512
         }
 
@@ -336,7 +336,7 @@ class FaceDatabase:
             'total_faces': len(self.faces),
             'total_recognitions': total_recognitions,
             'threshold': self.threshold,
-            'model_name': self.config.get('model_name', 'buffalo_l'),
+            'model_name': self.config.get('model_name', 'default'),
             'db_path': self.db_path
         }
 
