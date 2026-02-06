@@ -68,6 +68,14 @@ htmlcov/
 .ipynb_checkpoints
 
 # Face data (privacy)
+# 실제 얼굴 데이터는 제외하되, 디렉토리 구조는 유지
+backend/data/face_database.json
+backend/data/embeddings/*.npy
+backend/data/faces/*.jpg
+backend/data/faces/*.png
+backend/data/faces/*.jpeg
+
+# 기타 얼굴 데이터 디렉토리
 faces/
 face_data/
 registered_faces/
