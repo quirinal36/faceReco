@@ -115,14 +115,32 @@ faceReco/
 
 3. **의존성 패키지 설치**
    ```bash
-   # 기본 패키지 설치
    cd backend
+
+   # 옵션 1: 프로덕션 환경 (권장)
    pip install -r requirements.txt
+
+   # 옵션 2: 최소 설치 (빠른 테스트용)
+   pip install -r requirements-minimal.txt
+
+   # 옵션 3: 개발 환경 (개발자용)
+   pip install -r requirements-dev.txt
    ```
+
+   **Requirements 파일 설명**:
+   - `requirements.txt` - 프로덕션 환경 (완전한 기능)
+   - `requirements-minimal.txt` - 최소 환경 (빠른 설치, 제한된 기능)
+   - `requirements-dev.txt` - 개발 환경 (테스트, 린팅, 문서화 도구 포함)
 
    **중요**: Windows에서 InsightFace 설치 문제가 발생할 수 있습니다.
    - **권장 해결책**: [트러블슈팅 가이드](./TROUBLESHOOTING.md)의 해결책 1 또는 2 참고
    - Visual Studio Build Tools 설치 또는 Conda 환경 사용
+
+4. **설치 확인**
+   ```bash
+   # 설치된 패키지 확인
+   python test_installation.py
+   ```
 
    **참고**: 첫 실행 시 InsightFace buffalo_l 모델이 자동으로 다운로드됩니다 (~600MB)
 

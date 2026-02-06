@@ -1,0 +1,36 @@
+# Minimal Requirements for Face Recognition System
+# For quick testing or resource-constrained environments
+
+# Web Framework
+fastapi==0.128.2
+uvicorn==0.40.0
+python-multipart==0.0.22
+
+# Computer Vision
+opencv-python==4.7.0.72
+
+# Numerical Computing
+numpy==1.24.2
+
+# Machine Learning
+scikit-learn==1.7.2
+
+# Face Recognition (use old version that installs easily on Windows)
+# NOTE: This version has limited features. See TROUBLESHOOTING.md for full version
+insightface==0.2.1
+
+# ONNX Runtime
+onnxruntime==1.23.2
+
+# Supporting libraries
+onnx==1.20.1
+easydict==1.13
+tqdm==4.67.3
+Pillow==12.1.0
+pydantic==2.12.5
+coloredlogs==15.0.1
+sympy==1.14.0
+scipy==1.15.3
+
+# Note: This minimal version may not support all features
+# For full functionality, install from requirements.txt
