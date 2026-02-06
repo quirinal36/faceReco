@@ -1,0 +1,23 @@
+# 기본 의존성 패키지
+# Python 3.9+ 필요
+
+# 컴퓨터 비전
+opencv-python>=4.8.0
+
+# 머신러닝
+transformers>=4.35.0
+torch>=2.1.0
+
+# 웹 프레임워크 (하나 선택)
+# flask>=3.0.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# 유틸리티
+numpy>=1.24.0
+pillow>=10.0.0
+python-multipart>=0.0.6
+
+# 개발 도구
+pytest>=7.4.0
+black>=23.10.0
