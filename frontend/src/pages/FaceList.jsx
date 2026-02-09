@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { faceAPI } from '../services/api';
 
 function FaceList() {
+  const { t } = useTranslation();
   const [faces, setFaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,14 +24,14 @@ function FaceList() {
       setFaces(response.data.faces || []);
     } catch (error) {
       console.error('Failed to fetch faces:', error);
-      setError('등록된 얼굴 목록을 불러오는데 실패했습니다.');
+      setError(t('faceList.loading'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`정말로 "${name}"님의 얼굴을 삭제하시겠습니까?`)) {
+    if (!window.confirm(t('faceList.confirmDelete', { name }))) {
       return;
     }
 
@@ -40,7 +42,7 @@ function FaceList() {
       setFaces(faces.filter((face) => face.face_id !== id));
     } catch (error) {
       console.error('Failed to delete face:', error);
-      alert('얼굴 삭제에 실패했습니다.');
+      alert(t('faceList.messages.deleteFailed'));
     } finally {
       setDeleteLoading(null);
     }
@@ -72,7 +74,7 @@ function FaceList() {
         }
       } catch (error) {
         console.error('Failed to add sample:', error);
-        alert('샘플 추가에 실패했습니다.');
+        alert(t('faceList.messages.addSampleFailed'));
       } finally {
         setAddSampleLoading(null);
       }
@@ -82,7 +84,7 @@ function FaceList() {
   };
 
   const handleMerge = async (name) => {
-    if (!window.confirm(`정말로 "${name}" 이름을 가진 모든 얼굴을 하나로 통합하시겠습니까?`)) {
+    if (!window.confirm(t('faceList.confirmMerge', { name }))) {
       return;
     }
 
@@ -100,7 +102,7 @@ function FaceList() {
       }
     } catch (error) {
       console.error('Failed to merge faces:', error);
-      alert('얼굴 통합에 실패했습니다.');
+      alert(t('faceList.messages.mergeFailed'));
     } finally {
       setMergeLoading(null);
     }
@@ -140,7 +142,7 @@ function FaceList() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="text-gray-600">로딩 중...</p>
+          <p className="text-gray-600">{t('faceList.loading')}</p>
         </div>
       </div>
     );
@@ -150,14 +152,13 @@ function FaceList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-gray-800">등록된 얼굴</h2>
+          <h2 className="text-3xl font-bold text-gray-800">{t('faceList.title')}</h2>
           <p className="text-gray-600 mt-2">
-            총 <span className="font-semibold text-blue-600">{faces.length}</span>명의 얼굴이
-            등록되어 있습니다
+            {t('faceList.subtitle', { count: faces.length })}
           </p>
           {duplicateNames.length > 0 && (
             <p className="text-orange-600 mt-1 text-sm">
-              ⚠️ 중복된 이름: {duplicateNames.join(', ')}
+              {t('faceList.duplicateWarning', { names: duplicateNames.join(', ') })}
             </p>
           )}
         </div>
@@ -173,7 +174,7 @@ function FaceList() {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          <span>새로고침</span>
+          <span>{t('faceList.refresh')}</span>
         </button>
       </div>
 
@@ -197,7 +198,7 @@ function FaceList() {
             onClick={fetchFaces}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
-            다시 시도
+            {t('dashboard.retry')}
           </button>
         </div>
       ) : faces.length === 0 ? (
@@ -215,9 +216,9 @@ function FaceList() {
               d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
             />
           </svg>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">등록된 얼굴이 없습니다</h3>
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">{t('faceList.noFaces')}</h3>
           <p className="text-gray-600 mb-6">
-            새로운 얼굴을 등록하여 인식 시스템을 시작하세요
+            {t('faceList.noFacesDescription')} {t('faceList.registerFirst')}
           </p>
           <a
             href="/register"
@@ -231,7 +232,7 @@ function FaceList() {
                 d="M12 6v6m0 0v6m0-6h6m-6 0H6"
               />
             </svg>
-            <span>얼굴 등록하기</span>
+            <span>{t('registration.register')}</span>
           </a>
         </div>
       ) : (
@@ -286,7 +287,7 @@ function FaceList() {
                         d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                       />
                     </svg>
-                    <span className="font-medium">{face.sample_count || 1}개 샘플</span>
+                    <span className="font-medium">{face.sample_count || 1} {t('faceList.info.samples')}</span>
                   </div>
                   <div className="flex items-center space-x-1 text-green-600">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,7 +304,7 @@ function FaceList() {
                         d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                       />
                     </svg>
-                    <span className="font-medium">{face.recognition_count || 0}회 인식</span>
+                    <span className="font-medium">{face.recognition_count || 0} {t('faceList.info.recognized')}</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -338,7 +339,7 @@ function FaceList() {
                               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                             ></path>
                           </svg>
-                          <span>통합 중...</span>
+                          <span>{t('faceList.actions.merging')}</span>
                         </>
                       ) : (
                         <>
@@ -355,7 +356,7 @@ function FaceList() {
                               d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
                             />
                           </svg>
-                          <span>중복 통합</span>
+                          <span>{t('faceList.actions.merge')}</span>
                         </>
                       )}
                     </button>
@@ -390,7 +391,7 @@ function FaceList() {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           ></path>
                         </svg>
-                        <span>추가 중...</span>
+                        <span>{t('faceList.actions.addingSample')}</span>
                       </>
                     ) : (
                       <>
@@ -407,7 +408,7 @@ function FaceList() {
                             d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                           />
                         </svg>
-                        <span>샘플 추가</span>
+                        <span>{t('faceList.actions.addSample')}</span>
                       </>
                     )}
                   </button>
@@ -441,7 +442,7 @@ function FaceList() {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      <span>삭제 중...</span>
+                      <span>{t('faceList.actions.deleting')}</span>
                     </>
                   ) : (
                     <>
@@ -458,7 +459,7 @@ function FaceList() {
                           d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                         />
                       </svg>
-                      <span>삭제</span>
+                      <span>{t('faceList.actions.delete')}</span>
                     </>
                   )}
                 </button>

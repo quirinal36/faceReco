@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { faceAPI } from '../services/api';
 
 function Dashboard() {
+  const { t } = useTranslation();
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
@@ -46,7 +48,7 @@ function Dashboard() {
   }, [isStreaming]);
 
   const handleStreamError = () => {
-    setError('카메라 스트림을 불러올 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.');
+    setError(t('dashboard.error'));
     setIsStreaming(false);
   };
 
@@ -58,14 +60,14 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-800">실시간 카메라 모니터링</h2>
-        <p className="text-gray-600 mt-2">얼굴 인식 시스템의 실시간 피드를 확인하세요</p>
+        <h2 className="text-3xl font-bold text-gray-800">{t('dashboard.title')}</h2>
+        <p className="text-gray-600 mt-2">{t('dashboard.subtitle')}</p>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-800">카메라 피드</h3>
+            <h3 className="text-xl font-semibold text-gray-800">{t('dashboard.cameraFeed')}</h3>
             <div className="flex items-center space-x-2">
               <div
                 className={`w-3 h-3 rounded-full ${
@@ -73,7 +75,7 @@ function Dashboard() {
                 }`}
               ></div>
               <span className="text-sm font-medium text-gray-700">
-                {isStreaming ? 'LIVE' : 'OFFLINE'}
+                {isStreaming ? t('dashboard.live') : t('dashboard.offline')}
               </span>
             </div>
           </div>
@@ -100,7 +102,7 @@ function Dashboard() {
                     onClick={() => window.location.reload()}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    다시 시도
+                    {t('dashboard.retry')}
                   </button>
                 </div>
               </div>
@@ -134,7 +136,7 @@ function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">감지된 얼굴</p>
+                  <p className="text-sm text-gray-600">{t('dashboard.stats.detected')}</p>
                   <p className="text-2xl font-bold text-gray-800">
                     {isStreaming ? stats.faces_detected : '-'}
                   </p>
@@ -160,7 +162,7 @@ function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">인식 성공</p>
+                  <p className="text-sm text-gray-600">{t('dashboard.stats.recognized')}</p>
                   <p className="text-2xl font-bold text-gray-800">
                     {isStreaming ? stats.faces_recognized : '-'}
                   </p>
@@ -186,7 +188,7 @@ function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">처리 속도</p>
+                  <p className="text-sm text-gray-600">{t('dashboard.stats.fps')}</p>
                   <p className="text-2xl font-bold text-gray-800">
                     {isStreaming ? `${stats.fps} FPS` : '- FPS'}
                   </p>
@@ -213,11 +215,11 @@ function Dashboard() {
             />
           </svg>
           <div>
-            <h4 className="font-semibold text-blue-800">시스템 안내</h4>
+            <h4 className="font-semibold text-blue-800">{t('dashboard.info.title')}</h4>
             <p className="text-sm text-blue-700 mt-1">
-              실시간 카메라 피드가 표시되지 않는 경우, 백엔드 서버가 실행 중인지 확인하세요.
+              {t('dashboard.info.description')}
               <br />
-              서버 실행: <code className="bg-blue-100 px-2 py-1 rounded">cd backend && python server.py</code>
+              <code className="bg-blue-100 px-2 py-1 rounded">{t('dashboard.info.serverCommand')}</code>
             </p>
           </div>
         </div>

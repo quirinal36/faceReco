@@ -1,0 +1,108 @@
+{
+  "app": {
+    "title": "Face Recognition System",
+    "loading": "Loading..."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "register": "Face Registration",
+    "faceList": "Face List"
+  },
+  "dashboard": {
+    "title": "Real-time Camera Monitoring",
+    "subtitle": "Monitor your face recognition system in real-time",
+    "cameraFeed": "Camera Feed",
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "stats": {
+      "detected": "Detected Faces",
+      "recognized": "Recognized",
+      "fps": "Processing Speed"
+    },
+    "error": "Cannot load camera stream. Please make sure the backend server is running.",
+    "retry": "Retry",
+    "info": {
+      "title": "System Information",
+      "description": "If the real-time camera feed is not displayed, make sure the backend server is running.",
+      "serverCommand": "cd backend && python server.py"
+    }
+  },
+  "registration": {
+    "title": "Face Registration",
+    "subtitle": "Register faces using real-time camera",
+    "startCamera": "Start Camera",
+    "stopCamera": "Cancel",
+    "capture": "Capture",
+    "retake": "Retake",
+    "register": "Register Face",
+    "registering": "Registering...",
+    "name": "Name",
+    "namePlaceholder": "Enter name",
+    "captureGuide": {
+      "title": "Capture Guidelines",
+      "face": "Face the camera directly",
+      "lighting": "Ensure good lighting",
+      "distance": "Maintain appropriate distance",
+      "expression": "Maintain natural expression"
+    },
+    "steps": {
+      "title": "Registration Steps",
+      "camera": "Start Camera",
+      "capture": "Capture Face",
+      "name": "Enter Name",
+      "complete": "Registration Complete"
+    },
+    "info": {
+      "title": "Registration Information",
+      "description": "Please enter the registrant's information"
+    },
+    "messages": {
+      "success": "Registration complete!",
+      "starting": "Starting new registration",
+      "enterName": "Please enter a name",
+      "captureFirst": "Please capture a photo"
+    }
+  },
+  "faceList": {
+    "title": "Registered Faces",
+    "subtitle": "{{count}} faces registered",
+    "duplicateWarning": "⚠️ Duplicate names: {{names}}",
+    "refresh": "Refresh",
+    "loading": "Loading...",
+    "noFaces": "No registered faces",
+    "noFacesDescription": "There are no registered faces yet.",
+    "registerFirst": "Please register a face first.",
+    "actions": {
+      "merge": "Merge Duplicates",
+      "merging": "Merging...",
+      "addSample": "Add Sample",
+      "addingSample": "Adding...",
+      "delete": "Delete",
+      "deleting": "Deleting..."
+    },
+    "info": {
+      "registered": "Registered",
+      "lastSeen": "Last seen",
+      "never": "Never",
+      "samples": "Samples",
+      "recognized": "times recognized"
+    },
+    "confirmDelete": "Are you sure you want to delete the face '{{name}}'?",
+    "confirmMerge": "Do you want to merge all faces with the name '{{name}}' into one?",
+    "selectImage": "Select an image to add a sample for '{{name}}'",
+    "messages": {
+      "deleteFailed": "Failed to delete face",
+      "addSampleFailed": "Failed to add sample",
+      "mergeFailed": "Failed to merge faces"
+    }
+  },
+  "common": {
+    "error": "Error",
+    "success": "Success",
+    "close": "Close",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No"
+  }
+}

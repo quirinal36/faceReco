@@ -1,0 +1,108 @@
+{
+  "app": {
+    "title": "얼굴 인식 시스템",
+    "loading": "로딩 중..."
+  },
+  "nav": {
+    "dashboard": "대시보드",
+    "register": "얼굴 등록",
+    "faceList": "얼굴 목록"
+  },
+  "dashboard": {
+    "title": "실시간 카메라 모니터링",
+    "subtitle": "얼굴 인식 시스템의 실시간 피드를 확인하세요",
+    "cameraFeed": "카메라 피드",
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "stats": {
+      "detected": "감지된 얼굴",
+      "recognized": "인식 성공",
+      "fps": "처리 속도"
+    },
+    "error": "카메라 스트림을 불러올 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.",
+    "retry": "다시 시도",
+    "info": {
+      "title": "시스템 안내",
+      "description": "실시간 카메라 피드가 표시되지 않는 경우, 백엔드 서버가 실행 중인지 확인하세요.",
+      "serverCommand": "cd backend && python server.py"
+    }
+  },
+  "registration": {
+    "title": "얼굴 등록",
+    "subtitle": "실시간 카메라로 얼굴을 등록하세요",
+    "startCamera": "카메라 시작",
+    "stopCamera": "취소",
+    "capture": "촬영",
+    "retake": "다시 촬영",
+    "register": "얼굴 등록",
+    "registering": "등록 중...",
+    "name": "이름",
+    "namePlaceholder": "이름을 입력하세요",
+    "captureGuide": {
+      "title": "촬영 가이드",
+      "face": "카메라를 정면으로 바라보세요",
+      "lighting": "충분한 조명을 확보하세요",
+      "distance": "적절한 거리를 유지하세요",
+      "expression": "자연스러운 표정을 유지하세요"
+    },
+    "steps": {
+      "title": "등록 절차",
+      "camera": "카메라 시작",
+      "capture": "얼굴 촬영",
+      "name": "이름 입력",
+      "complete": "등록 완료"
+    },
+    "info": {
+      "title": "등록 정보",
+      "description": "등록할 사람의 정보를 입력해주세요"
+    },
+    "messages": {
+      "success": "등록 완료!",
+      "starting": "새로운 등록을 시작합니다",
+      "enterName": "이름을 입력해주세요",
+      "captureFirst": "사진을 촬영해주세요"
+    }
+  },
+  "faceList": {
+    "title": "등록된 얼굴",
+    "subtitle": "총 {{count}}명의 얼굴이 등록되어 있습니다",
+    "duplicateWarning": "⚠️ 중복된 이름: {{names}}",
+    "refresh": "새로고침",
+    "loading": "로딩 중...",
+    "noFaces": "등록된 얼굴이 없습니다",
+    "noFacesDescription": "아직 등록된 얼굴이 없습니다.",
+    "registerFirst": "먼저 얼굴을 등록해주세요.",
+    "actions": {
+      "merge": "중복 통합",
+      "merging": "통합 중...",
+      "addSample": "샘플 추가",
+      "addingSample": "추가 중...",
+      "delete": "삭제",
+      "deleting": "삭제 중..."
+    },
+    "info": {
+      "registered": "등록일",
+      "lastSeen": "마지막 인식",
+      "never": "없음",
+      "samples": "샘플 수",
+      "recognized": "회 인식"
+    },
+    "confirmDelete": "정말로 '{{name}}'님의 얼굴을 삭제하시겠습니까?",
+    "confirmMerge": "정말로 \"{{name}}\" 이름을 가진 모든 얼굴을 하나로 통합하시겠습니까?",
+    "selectImage": "'{{name}}'님의 샘플을 추가할 이미지를 선택하세요",
+    "messages": {
+      "deleteFailed": "얼굴 삭제에 실패했습니다",
+      "addSampleFailed": "샘플 추가에 실패했습니다",
+      "mergeFailed": "얼굴 통합에 실패했습니다"
+    }
+  },
+  "common": {
+    "error": "오류",
+    "success": "성공",
+    "close": "닫기",
+    "cancel": "취소",
+    "confirm": "확인",
+    "yes": "예",
+    "no": "아니오"
+  }
+}

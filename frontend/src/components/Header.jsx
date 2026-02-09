@@ -1,4 +1,9 @@
+import { useTranslation } from 'react-i18next';
+import LanguageSwitcher from './LanguageSwitcher';
+
 function Header() {
+  const { t } = useTranslation();
+
   return (
     <header className="bg-white shadow-sm">
       <div className="px-6 py-4">
@@ -25,10 +30,10 @@ function Header() {
                 />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-gray-800">얼굴 인식 시스템</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{t('app.title')}</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Face Recognition Dashboard</span>
+            <LanguageSwitcher />
           </div>
         </div>
       </div>

@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { faceAPI } from '../services/api';
 
 function FaceRegistration() {
+  const { t } = useTranslation();
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -96,12 +98,12 @@ function FaceRegistration() {
     console.log('=== 얼굴 등록 시작 ===');
 
     if (!name.trim()) {
-      setMessage({ type: 'error', text: '이름을 입력해주세요.' });
+      setMessage({ type: 'error', text: t('registration.messages.enterName') });
       return;
     }
 
     if (!captured) {
-      setMessage({ type: 'error', text: '사진을 촬영해주세요.' });
+      setMessage({ type: 'error', text: t('registration.messages.captureFirst') });
       return;
     }
 
@@ -213,8 +215,8 @@ function FaceRegistration() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-800">얼굴 등록</h2>
-        <p className="text-gray-600 mt-2">실시간 카메라로 얼굴을 등록하세요</p>
+        <h2 className="text-3xl font-bold text-gray-800">{t('registration.title')}</h2>
+        <p className="text-gray-600 mt-2">{t('registration.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -236,7 +238,7 @@ function FaceRegistration() {
                         d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
                       />
                     </svg>
-                    <span className="text-lg font-medium">카메라 시작</span>
+                    <span className="text-lg font-medium">{t('registration.startCamera')}</span>
                   </button>
                 </div>
               )}
@@ -269,7 +271,7 @@ function FaceRegistration() {
                           d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
                         />
                       </svg>
-                      <span>촬영 (Space)</span>
+                      <span>{t('registration.capture')}</span>
                     </button>
                     <button
                       onClick={stopCamera}
@@ -283,7 +285,7 @@ function FaceRegistration() {
                           d="M6 18L18 6M6 6l12 12"
                         />
                       </svg>
-                      <span>취소</span>
+                      <span>{t('registration.stopCamera')}</span>
                     </button>
                   </div>
                 </>
@@ -306,7 +308,7 @@ function FaceRegistration() {
                             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                           />
                         </svg>
-                        <span>다시 촬영</span>
+                        <span>{t('registration.retake')}</span>
                       </button>
                     </div>
                   )}
@@ -331,11 +333,12 @@ function FaceRegistration() {
                     />
                   </svg>
                   <div>
-                    <p className="text-sm font-medium text-blue-800">촬영 가이드</p>
+                    <p className="text-sm font-medium text-blue-800">{t('registration.captureGuide.title')}</p>
                     <ul className="text-sm text-blue-700 mt-1 space-y-1">
-                      <li>• 얼굴이 화면 중앙에 오도록 위치하세요</li>
-                      <li>• 정면을 바라보고 자연스러운 표정을 지으세요</li>
-                      <li>• 스페이스바 또는 촬영 버튼을 눌러 촬영하세요</li>
+                      <li>• {t('registration.captureGuide.face')}</li>
+                      <li>• {t('registration.captureGuide.lighting')}</li>
+                      <li>• {t('registration.captureGuide.distance')}</li>
+                      <li>• {t('registration.captureGuide.expression')}</li>
                     </ul>
                   </div>
                 </div>
@@ -347,7 +350,7 @@ function FaceRegistration() {
         {/* 등록 정보 입력 */}
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">등록 정보</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">{t('registration.info.title')}</h3>
 
             {step === 'registered' ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -366,8 +369,8 @@ function FaceRegistration() {
                     />
                   </svg>
                   <div>
-                    <h4 className="font-semibold text-green-800">등록 완료!</h4>
-                    <p className="text-sm text-green-700 mt-1">새로운 등록을 시작합니다...</p>
+                    <h4 className="font-semibold text-green-800">{t('registration.messages.success')}</h4>
+                    <p className="text-sm text-green-700 mt-1">{t('registration.messages.starting')}</p>
                   </div>
                 </div>
               </div>
@@ -376,7 +379,7 @@ function FaceRegistration() {
                 <div className="space-y-4">
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      이름 *
+                      {t('registration.name')}
                     </label>
                     <input
                       type="text"
@@ -384,7 +387,7 @@ function FaceRegistration() {
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="등록할 사람의 이름"
+                      placeholder={t('registration.namePlaceholder')}
                       disabled={loading || !captured}
                     />
                   </div>
@@ -438,10 +441,10 @@ function FaceRegistration() {
                             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                           ></path>
                         </svg>
-                        등록 중...
+                        {t('registration.registering')}
                       </span>
                     ) : (
-                      '얼굴 등록'
+                      t('registration.register')
                     )}
                   </button>
                 </div>
@@ -451,7 +454,7 @@ function FaceRegistration() {
 
           {/* 등록 절차 안내 */}
           <div className="bg-gray-50 rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">등록 절차</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">{t('registration.steps.title')}</h3>
             <div className="space-y-3">
               <div className="flex items-start space-x-3">
                 <div
@@ -462,8 +465,8 @@ function FaceRegistration() {
                   1
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-gray-800">카메라 시작</p>
-                  <p className="text-sm text-gray-600">카메라 버튼을 눌러 웹캠 활성화</p>
+                  <p className="font-medium text-gray-800">{t('registration.steps.camera')}</p>
+                  <p className="text-sm text-gray-600">{t('registration.captureGuide.face')}</p>
                 </div>
               </div>
 
@@ -476,8 +479,8 @@ function FaceRegistration() {
                   2
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-gray-800">얼굴 촬영</p>
-                  <p className="text-sm text-gray-600">정면을 보고 촬영 버튼 클릭</p>
+                  <p className="font-medium text-gray-800">{t('registration.steps.capture')}</p>
+                  <p className="text-sm text-gray-600">{t('registration.captureGuide.expression')}</p>
                 </div>
               </div>
 
@@ -490,8 +493,8 @@ function FaceRegistration() {
                   3
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-gray-800">이름 입력</p>
-                  <p className="text-sm text-gray-600">등록할 사람의 이름 입력</p>
+                  <p className="font-medium text-gray-800">{t('registration.steps.name')}</p>
+                  <p className="text-sm text-gray-600">{t('registration.info.description')}</p>
                 </div>
               </div>
 
@@ -504,8 +507,8 @@ function FaceRegistration() {
                   4
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-gray-800">등록 완료</p>
-                  <p className="text-sm text-gray-600">얼굴 등록 버튼 클릭</p>
+                  <p className="font-medium text-gray-800">{t('registration.steps.complete')}</p>
+                  <p className="text-sm text-gray-600">{t('registration.register')}</p>
                 </div>
               </div>
             </div>

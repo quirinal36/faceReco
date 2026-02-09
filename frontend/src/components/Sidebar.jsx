@@ -1,10 +1,13 @@
 import { NavLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 function Sidebar() {
+  const { t } = useTranslation();
+
   const navItems = [
     {
       path: '/',
-      name: '실시간 모니터링',
+      name: t('nav.dashboard'),
       icon: (
         <svg
           className="w-5 h-5"
@@ -23,7 +26,7 @@ function Sidebar() {
     },
     {
       path: '/register',
-      name: '얼굴 등록',
+      name: t('nav.register'),
       icon: (
         <svg
           className="w-5 h-5"
@@ -42,7 +45,7 @@ function Sidebar() {
     },
     {
       path: '/faces',
-      name: '등록된 얼굴',
+      name: t('nav.faceList'),
       icon: (
         <svg
           className="w-5 h-5"
