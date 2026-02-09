@@ -14,7 +14,8 @@
     "test:headed": "playwright test --headed",
     "test:debug": "playwright test --debug",
     "test:report": "playwright show-report",
-    "capture-screenshots": "node capture-screenshots.js"
+    "capture-screenshots": "node capture-screenshots.js",
+    "capture-screenshots-i18n": "node capture-screenshots-i18n.js"
   },
   "dependencies": {
     "axios": "^1.13.5",

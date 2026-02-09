@@ -104,15 +104,15 @@ faceReco/
 ## 스크린샷
 
 ### 대시보드 - 실시간 얼굴 모니터링
-![대시보드](./docs/screenshots/01-dashboard.png)
+![대시보드](./docs/screenshots/kr/01-dashboard.png)
 메인 대시보드에서 실시간으로 얼굴을 감지하고 인식하며, 감지된 얼굴 수, 인식된 얼굴 수, 처리 속도(FPS) 등의 통계를 실시간으로 확인할 수 있습니다.
 
 ### 얼굴 등록
-![얼굴 등록](./docs/screenshots/02-face-registration.png)
+![얼굴 등록](./docs/screenshots/kr/02-face-registration.png)
 웹 인터페이스를 통해 카메라로 얼굴을 촬영하고 새로운 얼굴을 등록할 수 있습니다. 다국어 지원으로 한국어와 영어를 선택할 수 있습니다.
 
 ### 얼굴 목록 관리
-![얼굴 목록](./docs/screenshots/03-face-list.png)
+![얼굴 목록](./docs/screenshots/kr/03-face-list.png)
 등록된 모든 얼굴을 확인하고 관리할 수 있습니다. 얼굴 삭제 및 중복 감지 기능을 제공합니다.
 
 ## 주요 기능

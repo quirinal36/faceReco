@@ -327,15 +327,15 @@ Project progress can be tracked at [GitHub Issues](https://github.com/quirinal36
 ## Screenshots
 
 ### Dashboard - Real-time Face Monitoring
-![Dashboard](./docs/screenshots/01-dashboard.png)
+![Dashboard](./docs/screenshots/en/01-dashboard.png)
 The main dashboard provides real-time face detection and recognition with live statistics including detected faces count, recognized faces count, and processing speed (FPS).
 
 ### Face Registration
-![Face Registration](./docs/screenshots/02-face-registration.png)
+![Face Registration](./docs/screenshots/en/02-face-registration.png)
 Register new faces through the web interface with camera capture and multi-language support.
 
 ### Face List Management
-![Face List](./docs/screenshots/03-face-list.png)
+![Face List](./docs/screenshots/en/03-face-list.png)
 View and manage all registered faces with options for deletion and duplicate detection.
 
 ## Features
