@@ -324,6 +324,20 @@ Project progress can be tracked at [GitHub Issues](https://github.com/quirinal36
 - **Milestone 5**: Web Dashboard Development 🚧
 - **Milestone 6**: Integration and Deployment Preparation
 
+## Screenshots
+
+### Dashboard - Real-time Face Monitoring
+![Dashboard](./docs/screenshots/01-dashboard.png)
+The main dashboard provides real-time face detection and recognition with live statistics including detected faces count, recognized faces count, and processing speed (FPS).
+
+### Face Registration
+![Face Registration](./docs/screenshots/02-face-registration.png)
+Register new faces through the web interface with camera capture and multi-language support.
+
+### Face List Management
+![Face List](./docs/screenshots/03-face-list.png)
+View and manage all registered faces with options for deletion and duplicate detection.
+
 ## Features
 
 ### Multi-Sample Face Recognition
@@ -341,6 +355,65 @@ Project progress can be tracked at [GitHub Issues](https://github.com/quirinal36
 - Playwright E2E tests for frontend
 - Webcam mocking for testing without hardware
 - API integration tests
+
+### Internationalization (i18n)
+- Multi-language support (English/Korean)
+- Easy language switching
+- Localized UI components
+
+## How to Use
+
+### 1. Initial Setup
+1. Clone the repository and install dependencies (see [Installation](#installation))
+2. Start both backend and frontend servers:
+   ```bash
+   npm run dev
+   ```
+3. Access the web dashboard at http://localhost:5173
+
+### 2. Registering Faces
+1. Navigate to **Face Registration** page from the sidebar
+2. Allow camera access when prompted
+3. Position your face in the camera view
+4. Click **Capture** button to take a photo
+5. Enter a name for the person
+6. Click **Register** to save the face
+
+**Tips:**
+- Ensure good lighting for better recognition
+- Capture multiple angles for improved accuracy
+- Keep your face centered in the frame
+
+### 3. Monitoring Dashboard
+1. Go to the **Dashboard** page
+2. The system will automatically start detecting and recognizing faces
+3. View real-time statistics:
+   - **Detected Faces**: Total faces detected in the current frame
+   - **Recognized Faces**: Number of faces matched with registered persons
+   - **FPS**: Processing speed in frames per second
+
+**Camera Feed:**
+- Green boxes: Recognized faces (with name and confidence score)
+- Red boxes: Unregistered/unknown faces
+
+### 4. Managing Registered Faces
+1. Navigate to **Face List** page
+2. View all registered faces with their details
+3. Use the **Delete** button to remove faces
+4. System automatically detects duplicate entries
+
+### 5. Testing Without a Camera
+The system includes Playwright E2E tests that work without physical hardware:
+```bash
+cd frontend
+npm test
+```
+
+### 6. API Integration
+For developers integrating with the backend API:
+- **API Documentation**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+- See [API Guide](./API_GUIDE.md) for detailed endpoint documentation
 
 ## License
 TBD
