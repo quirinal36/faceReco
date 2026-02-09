@@ -103,10 +103,13 @@ class FaceDatabase:
                 'face_id': face_id,
                 'name': metadata.get('name', face_id),
                 'embedding_path': f"embeddings/{face_id}.npy",
+                'embedding_paths': [f"embeddings/{face_id}.npy"],  # 다중 임베딩 지원
                 'image_path': f"faces/{face_id}.jpg" if image_path else None,
+                'image_paths': [f"faces/{face_id}.jpg"] if image_path else [],  # 다중 이미지 지원
                 'registered_at': metadata.get('registered_at', datetime.now().isoformat()),
                 'last_seen': None,
                 'recognition_count': 0,
+                'sample_count': 1,  # 샘플 개수
                 'metadata': metadata
             }
 
@@ -122,13 +125,77 @@ class FaceDatabase:
             print(f"얼굴 등록 실패: {str(e)}")
             return False
 
+    def add_face_sample(
+        self,
+        face_id: str,
+        embedding: np.ndarray,
+        face_image: Optional[np.ndarray] = None
+    ) -> bool:
+        """
+        기존 얼굴에 추가 샘플 등록 (같은 사람의 다른 사진)
+
+        Args:
+            face_id (str): 기존 얼굴 ID
+            embedding (np.ndarray): 새로운 얼굴 임베딩 벡터
+            face_image (Optional[np.ndarray]): 새로운 얼굴 이미지
+
+        Returns:
+            bool: 추가 성공 여부
+        """
+        if face_id not in self.faces:
+            print(f"얼굴 ID '{face_id}'를 찾을 수 없습니다.")
+            return False
+
+        try:
+            face_data = self.faces[face_id]
+
+            # 샘플 인덱스 계산
+            sample_idx = face_data.get('sample_count', 1)
+
+            # 임베딩 저장
+            embedding_path = os.path.join(self.embeddings_dir, f"{face_id}_{sample_idx}.npy")
+            np.save(embedding_path, embedding)
+
+            # 임베딩 경로 추가
+            if 'embedding_paths' not in face_data:
+                # 기존 데이터 마이그레이션
+                face_data['embedding_paths'] = [face_data.get('embedding_path', f"embeddings/{face_id}.npy")]
+
+            face_data['embedding_paths'].append(f"embeddings/{face_id}_{sample_idx}.npy")
+
+            # 이미지 저장 (선택사항)
+            if face_image is not None:
+                image_path = os.path.join(self.faces_dir, f"{face_id}_{sample_idx}.jpg")
+                cv2.imwrite(image_path, face_image)
+
+                # 이미지 경로 추가
+                if 'image_paths' not in face_data:
+                    # 기존 데이터 마이그레이션
+                    existing_image = face_data.get('image_path')
+                    face_data['image_paths'] = [existing_image] if existing_image else []
+
+                face_data['image_paths'].append(f"faces/{face_id}_{sample_idx}.jpg")
+
+            # 샘플 카운트 증가
+            face_data['sample_count'] = sample_idx + 1
+
+            # 저장
+            self.save()
+
+            print(f"'{face_data['name']}'에 {sample_idx + 1}번째 샘플 추가 완료")
+            return True
+
+        except Exception as e:
+            print(f"샘플 추가 실패: {str(e)}")
+            return False
+
     def find_match(
         self,
         embedding: np.ndarray,
         top_k: int = 1
     ) -> List[Tuple[str, float]]:
         """
-        임베딩과 가장 유사한 얼굴 검색
+        임베딩과 가장 유사한 얼굴 검색 (다중 임베딩 지원)
 
         Args:
             embedding (np.ndarray): 쿼리 임베딩
@@ -143,23 +210,36 @@ class FaceDatabase:
         similarities = []
 
         for face_id, face_data in self.faces.items():
-            # 임베딩 로드
-            embedding_path = os.path.join(
-                self.data_dir,
-                face_data['embedding_path']
-            )
+            # 다중 임베딩 경로 가져오기 (하위 호환성 유지)
+            embedding_paths = face_data.get('embedding_paths')
+            if not embedding_paths:
+                # 기존 단일 임베딩 경로 사용
+                embedding_paths = [face_data.get('embedding_path')]
 
-            if not os.path.exists(embedding_path):
-                continue
+            max_similarity = 0.0
 
-            stored_embedding = np.load(embedding_path)
+            # 모든 임베딩과 비교하여 최고 유사도 사용
+            for emb_path in embedding_paths:
+                if not emb_path:
+                    continue
 
-            # 유사도 계산
-            emb1 = embedding.reshape(1, -1)
-            emb2 = stored_embedding.reshape(1, -1)
-            similarity = cosine_similarity(emb1, emb2)[0][0]
+                full_path = os.path.join(self.data_dir, emb_path)
 
-            similarities.append((face_id, float(similarity)))
+                if not os.path.exists(full_path):
+                    continue
+
+                stored_embedding = np.load(full_path)
+
+                # 유사도 계산
+                emb1 = embedding.reshape(1, -1)
+                emb2 = stored_embedding.reshape(1, -1)
+                similarity = cosine_similarity(emb1, emb2)[0][0]
+
+                # 최고 유사도 갱신
+                max_similarity = max(max_similarity, similarity)
+
+            if max_similarity > 0:
+                similarities.append((face_id, float(max_similarity)))
 
         # 유사도 기준 내림차순 정렬
         similarities.sort(key=lambda x: x[1], reverse=True)
@@ -203,7 +283,7 @@ class FaceDatabase:
 
     def remove_face(self, face_id: str) -> bool:
         """
-        얼굴 삭제
+        얼굴 삭제 (모든 샘플 포함)
 
         Args:
             face_id (str): 삭제할 얼굴 ID
@@ -217,16 +297,21 @@ class FaceDatabase:
         try:
             face_data = self.faces[face_id]
 
-            # 임베딩 파일 삭제
-            embedding_path = os.path.join(self.data_dir, face_data['embedding_path'])
-            if os.path.exists(embedding_path):
-                os.remove(embedding_path)
+            # 모든 임베딩 파일 삭제
+            embedding_paths = face_data.get('embedding_paths', [face_data.get('embedding_path')])
+            for emb_path in embedding_paths:
+                if emb_path:
+                    full_path = os.path.join(self.data_dir, emb_path)
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
 
-            # 이미지 파일 삭제
-            if face_data.get('image_path'):
-                image_path = os.path.join(self.data_dir, face_data['image_path'])
-                if os.path.exists(image_path):
-                    os.remove(image_path)
+            # 모든 이미지 파일 삭제
+            image_paths = face_data.get('image_paths', [face_data.get('image_path')])
+            for img_path in image_paths:
+                if img_path:
+                    full_path = os.path.join(self.data_dir, img_path)
+                    if os.path.exists(full_path):
+                        os.remove(full_path)
 
             # 데이터베이스에서 제거
             del self.faces[face_id]
@@ -257,6 +342,73 @@ class FaceDatabase:
         self.faces[face_id]['metadata'].update(metadata)
         self.save()
         return True
+
+    def merge_faces_by_name(self, name: str) -> Optional[str]:
+        """
+        같은 이름을 가진 모든 얼굴을 하나로 통합
+
+        Args:
+            name (str): 통합할 이름
+
+        Returns:
+            Optional[str]: 통합된 메인 face_id 또는 None (실패시)
+        """
+        # 같은 이름을 가진 모든 얼굴 찾기
+        matching_faces = []
+        for face_id, face_data in self.faces.items():
+            if face_data.get('name') == name:
+                matching_faces.append((face_id, face_data))
+
+        if len(matching_faces) <= 1:
+            print(f"'{name}' 이름을 가진 얼굴이 1개 이하입니다. 통합할 필요가 없습니다.")
+            return None
+
+        # 가장 오래된 얼굴을 메인으로 선택 (registered_at 기준)
+        matching_faces.sort(key=lambda x: x[1].get('registered_at', ''))
+        main_face_id, main_face_data = matching_faces[0]
+
+        print(f"'{name}' 이름을 가진 {len(matching_faces)}개의 얼굴을 '{main_face_id}'로 통합합니다...")
+
+        try:
+            # 나머지 얼굴들의 샘플을 메인 얼굴에 추가
+            for face_id, face_data in matching_faces[1:]:
+                print(f"  - {face_id}의 샘플들을 {main_face_id}에 추가 중...")
+
+                # 모든 임베딩 가져오기
+                embedding_paths = face_data.get('embedding_paths', [face_data.get('embedding_path')])
+                image_paths = face_data.get('image_paths', [face_data.get('image_path')])
+
+                for i, emb_path in enumerate(embedding_paths):
+                    if not emb_path:
+                        continue
+
+                    # 임베딩 로드
+                    full_emb_path = os.path.join(self.data_dir, emb_path)
+                    if not os.path.exists(full_emb_path):
+                        continue
+
+                    embedding = np.load(full_emb_path)
+
+                    # 이미지 로드 (있으면)
+                    face_image = None
+                    if i < len(image_paths) and image_paths[i]:
+                        full_img_path = os.path.join(self.data_dir, image_paths[i])
+                        if os.path.exists(full_img_path):
+                            face_image = cv2.imread(full_img_path)
+
+                    # 메인 얼굴에 샘플 추가
+                    self.add_face_sample(main_face_id, embedding, face_image)
+
+                # 원본 얼굴 삭제
+                self.remove_face(face_id)
+                print(f"  - {face_id} 삭제 완료")
+
+            print(f"'{name}' 통합 완료! 메인 ID: {main_face_id}, 총 샘플 수: {main_face_data['sample_count']}")
+            return main_face_id
+
+        except Exception as e:
+            print(f"얼굴 통합 실패: {str(e)}")
+            return None
 
     def get_all_faces(self) -> List[Dict]:
         """

@@ -85,3 +85,6 @@ node_modules/
 
 # Claude Code memory
 .claude/
+
+frontend/playwright-report/**
+frontend/test-results/**

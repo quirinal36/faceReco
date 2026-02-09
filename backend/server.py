@@ -6,8 +6,10 @@ FastAPI 서버 애플리케이션
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import uvicorn
+import os
 
 # API 라우트 import
 from api.routes import router, cleanup_resources
@@ -75,6 +77,15 @@ app.add_middleware(
 # ==================== 라우터 등록 ====================
 
 app.include_router(router)
+
+
+# ==================== Static 파일 제공 ====================
+
+# data 디렉토리를 static 파일로 마운트
+data_dir = os.path.join(os.path.dirname(__file__), "data")
+os.makedirs(data_dir, exist_ok=True)
+
+app.mount("/data", StaticFiles(directory=data_dir), name="data")
 
 
 # ==================== 루트 엔드포인트 ====================

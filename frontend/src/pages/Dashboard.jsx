@@ -4,7 +4,46 @@ import { faceAPI } from '../services/api';
 function Dashboard() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    faces_detected: 0,
+    faces_recognized: 0,
+    fps: 0
+  });
   const streamUrl = faceAPI.getCameraStreamUrl();
+
+  // 실시간 통계 업데이트
+  useEffect(() => {
+    let intervalId = null;
+
+    const fetchStats = async () => {
+      try {
+        const response = await faceAPI.getCameraStats();
+        setStats({
+          faces_detected: response.data.faces_detected,
+          faces_recognized: response.data.faces_recognized,
+          fps: response.data.fps
+        });
+      } catch (error) {
+        // 통계 가져오기 실패 시 무시 (스트림이 시작되지 않았을 수 있음)
+        console.debug('Stats fetch failed:', error.message);
+      }
+    };
+
+    // 스트리밍 중일 때만 통계 업데이트
+    if (isStreaming) {
+      // 즉시 한 번 실행
+      fetchStats();
+
+      // 1초마다 통계 업데이트
+      intervalId = setInterval(fetchStats, 1000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [isStreaming]);
 
   const handleStreamError = () => {
     setError('카메라 스트림을 불러올 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.');
@@ -96,7 +135,9 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">감지된 얼굴</p>
-                  <p className="text-2xl font-bold text-gray-800">-</p>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {isStreaming ? stats.faces_detected : '-'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -120,7 +161,9 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">인식 성공</p>
-                  <p className="text-2xl font-bold text-gray-800">-</p>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {isStreaming ? stats.faces_recognized : '-'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -144,7 +187,9 @@ function Dashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">처리 속도</p>
-                  <p className="text-2xl font-bold text-gray-800">- FPS</p>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {isStreaming ? `${stats.fps} FPS` : '- FPS'}
+                  </p>
                 </div>
               </div>
             </div>

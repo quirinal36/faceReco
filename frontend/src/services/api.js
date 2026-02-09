@@ -59,6 +59,16 @@ export const faceAPI = {
   // 얼굴 삭제
   deleteFace: (id) => api.delete(`/api/face/${id}`),
 
+  // 추가 샘플 등록 (같은 사람의 다른 사진)
+  addFaceSample: (faceId, formData) => api.post(`/api/face/${faceId}/add-sample`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
+
+  // 같은 이름을 가진 얼굴 통합
+  mergeFacesByName: (name) => api.post(`/api/faces/merge/${encodeURIComponent(name)}`),
+
   // 얼굴 인식
   recognizeFace: (formData) => api.post('/api/face/recognize', formData, {
     headers: {
@@ -68,6 +78,9 @@ export const faceAPI = {
 
   // 카메라 스트림 URL
   getCameraStreamUrl: () => `${API_BASE_URL}/api/camera/stream`,
+
+  // 카메라 통계
+  getCameraStats: () => api.get('/api/camera/stats'),
 };
 
 export default api;
