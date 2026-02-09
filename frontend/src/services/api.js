@@ -81,6 +81,12 @@ export const faceAPI = {
 
   // 카메라 통계
   getCameraStats: () => api.get('/api/camera/stats'),
+
+  // 카메라 해제 (얼굴 등록 시 프론트엔드 카메라 사용을 위해)
+  releaseCamera: () => api.post('/api/camera/release'),
+
+  // 카메라 재시작 (대시보드로 돌아올 때)
+  reopenCamera: () => api.post('/api/camera/reopen'),
 };
 
 export default api;

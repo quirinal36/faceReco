@@ -588,6 +588,47 @@ async def get_camera_stats():
     )
 
 
+# ==================== 카메라 제어 ====================
+
+@router.post("/camera/release")
+async def release_camera():
+    """
+    카메라 리소스 해제
+
+    얼굴 등록 페이지에서 프론트엔드 카메라를 사용하기 위해
+    백엔드 카메라를 일시적으로 해제합니다.
+    """
+    global _camera_handler
+
+    if _camera_handler is not None:
+        _camera_handler.release()
+        _camera_handler = None
+        return {"success": True, "message": "카메라가 해제되었습니다."}
+
+    return {"success": True, "message": "카메라가 이미 해제되어 있습니다."}
+
+
+@router.post("/camera/reopen")
+async def reopen_camera():
+    """
+    카메라 재시작
+
+    대시보드로 돌아올 때 백엔드 카메라를 다시 시작합니다.
+    """
+    global _camera_handler
+
+    try:
+        if _camera_handler is None or not _camera_handler.is_opened:
+            _camera_handler = CameraHandler(camera_id=0)
+            _camera_handler.open()
+            return {"success": True, "message": "카메라가 시작되었습니다."}
+
+        return {"success": True, "message": "카메라가 이미 실행 중입니다."}
+
+    except Exception as e:
+        return {"success": False, "message": f"카메라 시작 실패: {str(e)}"}
+
+
 # ==================== 정리 함수 ====================
 
 def cleanup_resources():

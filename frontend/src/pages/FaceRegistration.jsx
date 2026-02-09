@@ -205,10 +205,27 @@ function FaceRegistration() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [cameraActive, step]);
 
-  // 컴포넌트 언마운트 시 카메라 중지
+  // 컴포넌트 마운트 시 백엔드 카메라 해제
   useEffect(() => {
+    const releaseBackendCamera = async () => {
+      try {
+        await faceAPI.releaseCamera();
+        console.log('백엔드 카메라가 해제되었습니다.');
+      } catch (error) {
+        console.warn('백엔드 카메라 해제 실패:', error.message);
+      }
+    };
+
+    releaseBackendCamera();
+
+    // 컴포넌트 언마운트 시 프론트엔드 카메라 중지 및 백엔드 카메라 재시작
     return () => {
       stopCamera();
+
+      // 백엔드 카메라 재시작
+      faceAPI.reopenCamera().catch((error) => {
+        console.warn('백엔드 카메라 재시작 실패:', error.message);
+      });
     };
   }, []);
 

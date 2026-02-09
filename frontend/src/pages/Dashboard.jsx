@@ -13,6 +13,20 @@ function Dashboard() {
   });
   const streamUrl = faceAPI.getCameraStreamUrl();
 
+  // 컴포넌트 마운트 시 백엔드 카메라 재시작
+  useEffect(() => {
+    const startBackendCamera = async () => {
+      try {
+        await faceAPI.reopenCamera();
+        console.log('백엔드 카메라가 시작되었습니다.');
+      } catch (error) {
+        console.warn('백엔드 카메라 시작 실패:', error.message);
+      }
+    };
+
+    startBackendCamera();
+  }, []);
+
   // 실시간 통계 업데이트
   useEffect(() => {
     let intervalId = null;
