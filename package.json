@@ -1,0 +1,23 @@
+{
+  "name": "facereco",
+  "version": "1.0.0",
+  "description": "Face Recognition System - Monorepo",
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && python server.py",
+    "frontend": "cd frontend && npm run dev",
+    "install-all": "cd frontend && npm install",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": [
+    "face-recognition",
+    "react",
+    "fastapi",
+    "computer-vision"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

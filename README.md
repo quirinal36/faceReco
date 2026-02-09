@@ -12,9 +12,9 @@
 - 얼굴 등록 및 관리
 
 ## 기술 스택
-- **Backend**: Python, Flask/FastAPI, OpenCV
-- **ML**: Hugging Face Transformers, PyTorch
-- **Frontend**: React/Vue.js
+- **Backend**: Python 3.9+, FastAPI, OpenCV
+- **ML**: InsightFace (buffalo_l), PyTorch
+- **Frontend**: React 19, Vite, Tailwind CSS, React Router
 - **DevOps**: Git, GitHub
 
 ## 문서
@@ -40,7 +40,13 @@ faceReco/
 │   │   ├── embeddings/            # 얼굴 임베딩 (512차원)
 │   │   └── faces/                 # 얼굴 이미지
 │   └── requirements.txt   # Python 의존성
-├── frontend/              # 프론트엔드 (추후 개발)
+├── frontend/              # 프론트엔드 (React + Vite)
+│   ├── src/
+│   │   ├── components/         # UI 컴포넌트
+│   │   ├── pages/              # 페이지 (Dashboard, FaceRegistration, FaceList)
+│   │   ├── services/           # API 서비스
+│   │   └── utils/              # 유틸리티
+│   └── package.json
 ├── docs/                  # 문서
 ├── tests/                 # 테스트 코드
 ├── PRD.md                 # 제품 요구사항
@@ -49,7 +55,7 @@ faceReco/
 ```
 
 ## 프로젝트 상태
-현재 상태: **Milestone 4 - Backend API 개발 완료** ✅
+현재 상태: **Milestone 5 - 웹 대시보드 개발 진행 중** 🚧
 
 ### 완료된 작업
 **Milestone 1: 프로젝트 초기 설정** ✅
@@ -82,9 +88,18 @@ faceReco/
 - [x] 얼굴 등록/조회/삭제 API
 - [x] API 문서 작성 (Swagger UI)
 
+**Milestone 5: 웹 대시보드 개발** 🚧
+- [x] React + Vite 프론트엔드 프로젝트 초기화
+- [x] 기본 레이아웃 구조 (Header, Sidebar, Layout)
+- [x] 페이지 컴포넌트 (Dashboard, FaceRegistration, FaceList)
+- [x] API 클라이언트 설정 (Axios)
+- [ ] 실시간 카메라 모니터링 페이지 기능 강화
+- [ ] 얼굴 등록 페이지 테스트
+- [ ] 얼굴 목록 페이지 테스트
+
 ### 다음 단계
-- [ ] 웹 대시보드 개발 (Milestone 5)
-- [ ] 통합 및 배포 준비 (Milestone 6)
+- [ ] 통합 테스트 및 성능 최적화 (Milestone 5)
+- [ ] 배포 문서 작성 및 Docker 컨테이너화 (Milestone 6)
 
 ## 시작하기
 
@@ -145,6 +160,35 @@ faceReco/
    **참고**: 첫 실행 시 InsightFace buffalo_l 모델이 자동으로 다운로드됩니다 (~600MB)
 
 ### 실행 방법
+
+#### 🚀 빠른 실행 (권장)
+
+**방법 1: npm scripts 사용** (가장 편리)
+```bash
+# 프론트엔드 의존성 설치 (최초 1회)
+npm run install-all
+
+# 백엔드 + 프론트엔드 동시 실행
+npm run dev
+```
+
+**방법 2: 실행 스크립트 사용**
+```bash
+# Windows
+start-dev.bat
+
+# Linux/Mac
+./start-dev.sh
+```
+
+서버 시작 후:
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API 문서**: http://localhost:8000/docs
+
+---
+
+#### 개별 실행 (수동)
 
 **가상환경 활성화 필수**:
 ```bash
