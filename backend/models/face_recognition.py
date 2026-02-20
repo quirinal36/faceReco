@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from typing import Optional, Tuple, List, Dict
 from sklearn.metrics.pairwise import cosine_similarity
+from utils.text_utils import put_korean_text, get_text_size
 
 
 class FaceRecognizer:
@@ -224,7 +225,7 @@ class FaceRecognizer:
     def detect_and_extract(
         self,
         image: np.ndarray
-    ) -> List[Tuple[np.ndarray, np.ndarray]]:
+    ) -> List[dict]:
         """
         이미지에서 모든 얼굴 감지 및 임베딩 추출
 
@@ -232,8 +233,11 @@ class FaceRecognizer:
             image (np.ndarray): 입력 이미지
 
         Returns:
-            List[Tuple[np.ndarray, np.ndarray]]: (bbox, embedding) 리스트
+            List[dict]: 각 얼굴 정보 딕셔너리 리스트
                 bbox: [x1, y1, x2, y2] 형식
+                embedding: 512차원 임베딩 벡터
+                age: 추정 나이 (int) 또는 None
+                gender: 0=여성, 1=남성 또는 None
         """
         if image is None or image.size == 0:
             return []
@@ -251,7 +255,14 @@ class FaceRecognizer:
         for face in faces:
             bbox = face.bbox.astype(int)
             embedding = face.embedding
-            results.append((bbox, embedding))
+            age = getattr(face, 'age', None)
+            gender = getattr(face, 'gender', None)
+            results.append({
+                'bbox': bbox,
+                'embedding': embedding,
+                'age': age,
+                'gender': gender,
+            })
 
         return results
 
@@ -308,8 +319,8 @@ def demo_face_registration(camera_id: int = 0) -> None:
             # 얼굴 감지 및 박스 표시
             results = recognizer.detect_and_extract(frame)
 
-            for bbox, _ in results:
-                x1, y1, x2, y2 = bbox
+            for face_result in results:
+                x1, y1, x2, y2 = face_result['bbox']
                 cv2.rectangle(display_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
             # 안내 메시지 표시
@@ -426,8 +437,20 @@ def demo_face_recognition(camera_id: int = 0) -> None:
             # 모든 얼굴 감지 및 임베딩 추출
             results = recognizer.detect_and_extract(frame)
 
-            for bbox, embedding in results:
+            for face_result in results:
+                bbox = face_result['bbox']
+                embedding = face_result['embedding']
+                age = face_result.get('age')
+                gender = face_result.get('gender')
                 x1, y1, x2, y2 = bbox
+
+                # 나이/성별 문자열 생성
+                ag_parts = []
+                if gender is not None:
+                    ag_parts.append("남성" if gender == 1 else "여성")
+                if age is not None:
+                    ag_parts.append(f"{age}세")
+                age_gender_str = ", ".join(ag_parts)
 
                 # 데이터베이스에서 매칭
                 match = database.recognize_face(embedding)
@@ -449,32 +472,31 @@ def demo_face_recognition(camera_id: int = 0) -> None:
                     color = (0, 0, 255)
                     label = "Unknown"
 
+                if age_gender_str:
+                    label = f"{label} {age_gender_str}"
+
                 # 박스 그리기
                 cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
 
-                # 레이블 배경
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                font_thickness = 2
-                text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+                # 레이블 배경 (Pillow 기반 한글 지원)
+                font_size = 20
+                text_w, text_h = get_text_size(label, font_size)
 
                 cv2.rectangle(
                     display_frame,
-                    (x1, y1 - text_size[1] - 10),
-                    (x1 + text_size[0], y1),
+                    (x1, y1 - text_h - 10),
+                    (x1 + text_w + 4, y1),
                     color,
                     -1
                 )
 
-                # 레이블 텍스트
-                cv2.putText(
+                # 레이블 텍스트 (한글 지원)
+                put_korean_text(
                     display_frame,
                     label,
-                    (x1, y1 - 5),
-                    font,
-                    font_scale,
-                    (255, 255, 255),
-                    font_thickness
+                    (x1 + 2, y1 - text_h - 6),
+                    font_size=font_size,
+                    color=(255, 255, 255),
                 )
 
             # 통계 정보 표시

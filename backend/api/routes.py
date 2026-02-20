@@ -12,6 +12,8 @@ import cv2
 import numpy as np
 import io
 from datetime import datetime
+from PIL import ImageFont, ImageDraw, Image
+from utils.text_utils import put_korean_text, get_text_size
 
 # 로컬 모듈 import
 import sys
@@ -453,6 +455,18 @@ async def merge_faces(
 
 # ==================== 실시간 비디오 스트리밍 ====================
 
+def _format_age_gender(age, gender) -> str:
+    """나이와 성별 정보를 표시 문자열로 변환"""
+    if age is None and gender is None:
+        return ""
+    parts = []
+    if gender is not None:
+        parts.append("남성" if gender == 1 else "여성")
+    if age is not None:
+        parts.append(f"{age}세")
+    return ", ".join(parts)
+
+
 def generate_frames(
     recognizer: FaceRecognizer,
     database: FaceDatabase,
@@ -478,7 +492,11 @@ def generate_frames(
         _camera_stats['faces_detected'] = len(results)
         recognized_count = 0
 
-        for bbox, embedding in results:
+        for face_result in results:
+            bbox = face_result['bbox']
+            embedding = face_result['embedding']
+            age = face_result.get('age')
+            gender = face_result.get('gender')
             x1, y1, x2, y2 = bbox
 
             # 데이터베이스에서 매칭
@@ -498,32 +516,33 @@ def generate_frames(
                 color = (0, 0, 255)
                 label = "Unknown"
 
+            # 나이/성별 정보 추가
+            age_gender_str = _format_age_gender(age, gender)
+            if age_gender_str:
+                label = f"{label} {age_gender_str}"
+
             # 박스 그리기
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-            # 레이블 배경
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.6
-            font_thickness = 2
-            text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+            # 레이블 배경 (Pillow 기반 한글 지원)
+            font_size = 20
+            text_w, text_h = get_text_size(label, font_size)
 
             cv2.rectangle(
                 frame,
-                (x1, y1 - text_size[1] - 10),
-                (x1 + text_size[0], y1),
+                (x1, y1 - text_h - 10),
+                (x1 + text_w + 4, y1),
                 color,
                 -1
             )
 
-            # 레이블 텍스트
-            cv2.putText(
+            # 레이블 텍스트 (한글 지원)
+            put_korean_text(
                 frame,
                 label,
-                (x1, y1 - 5),
-                font,
-                font_scale,
-                (255, 255, 255),
-                font_thickness
+                (x1 + 2, y1 - text_h - 6),
+                font_size=font_size,
+                color=(255, 255, 255),
             )
 
         # 통계 업데이트 (인식 성공 수)

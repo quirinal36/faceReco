@@ -4,12 +4,16 @@ FastAPI 서버 애플리케이션
 얼굴 인식 시스템 웹 API 서버
 """
 
+import os
+import sys
+import glob
+
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import uvicorn
-import os
 
 # API 라우트 import
 from api.routes import router, cleanup_resources

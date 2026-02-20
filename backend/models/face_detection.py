@@ -7,6 +7,7 @@ Haar Cascade를 이용한 실시간 얼굴 감지
 import cv2
 import numpy as np
 from typing import List, Tuple, Optional
+from utils.text_utils import put_korean_text, get_text_size
 
 
 class FaceDetector:
@@ -113,30 +114,26 @@ class FaceDetector:
                 # 레이블 텍스트
                 label = f"Face {i + 1}"
 
-                # 텍스트 배경
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                font_thickness = 2
-                text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+                # 텍스트 배경 (Pillow 기반 한글 지원)
+                font_size = 20
+                text_w, text_h = get_text_size(label, font_size)
 
                 # 배경 사각형
                 cv2.rectangle(
                     result_frame,
-                    (x, y - text_size[1] - 10),
-                    (x + text_size[0], y),
+                    (x, y - text_h - 10),
+                    (x + text_w + 4, y),
                     color,
                     -1
                 )
 
-                # 텍스트
-                cv2.putText(
+                # 텍스트 (한글 지원)
+                put_korean_text(
                     result_frame,
                     label,
-                    (x, y - 5),
-                    font,
-                    font_scale,
-                    (255, 255, 255),
-                    font_thickness
+                    (x + 2, y - text_h - 6),
+                    font_size=font_size,
+                    color=(255, 255, 255),
                 )
 
         return result_frame

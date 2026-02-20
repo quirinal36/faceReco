@@ -207,10 +207,10 @@ npm test
    cd faceReco
    ```
 
-2. **Python 가상환경 생성 및 활성화**
+2. **Python 3.10 가상환경 생성 및 활성화**
    ```bash
    # 가상환경 생성
-   python3 -m venv venv
+   python -3.10 -m venv venv
 
    # 가상환경 활성화 (Linux/Mac)
    source venv/bin/activate
