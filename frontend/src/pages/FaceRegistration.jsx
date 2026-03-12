@@ -24,7 +24,11 @@ function FaceRegistration() {
       setMessage({ type: '', text: '' });
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 }
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: 'user',
+        }
       });
 
       // video 엘리먼트가 렌더링될 때까지 잠시 대기
@@ -230,16 +234,16 @@ function FaceRegistration() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-800">{t('registration.title')}</h2>
-        <p className="text-gray-600 mt-2">{t('registration.subtitle')}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">{t('registration.title')}</h2>
+        <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{t('registration.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* 카메라/캡처 영역 */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
             <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden relative">
               {!cameraActive && !captured && (
                 <div className="absolute inset-0 flex items-center justify-center">

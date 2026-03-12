@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import FaceRegistration from './pages/FaceRegistration';
 import FaceList from './pages/FaceList';
+import Attendance from './pages/Attendance';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="register" element={<FaceRegistration />} />
           <Route path="faces" element={<FaceList />} />
+          <Route path="attendance" element={<Attendance />} />
         </Route>
       </Routes>
     </Router>

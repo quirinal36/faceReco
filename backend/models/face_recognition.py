@@ -257,11 +257,17 @@ class FaceRecognizer:
             embedding = face.embedding
             age = getattr(face, 'age', None)
             gender = getattr(face, 'gender', None)
+            # Head Pose 추출 (yaw, pitch, roll)
+            pose = getattr(face, 'pose', None)
+            if pose is not None:
+                pose = [float(v) for v in pose]
+
             results.append({
                 'bbox': bbox,
                 'embedding': embedding,
                 'age': age,
                 'gender': gender,
+                'pose': pose,
             })
 
         return results

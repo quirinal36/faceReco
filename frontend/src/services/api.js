@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 // API 기본 URL (백엔드 서버 주소)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Vite 프록시를 통해 같은 오리진으로 요청 (외부 접속 시에도 포트 하나로 동작)
+// 직접 백엔드에 접속해야 할 경우 VITE_API_URL 환경변수로 지정
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // Axios 인스턴스 생성
 const api = axios.create({
@@ -43,6 +45,9 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// API base URL getter (다른 컴포넌트에서 이미지 URL 등에 사용)
+export const getApiBaseUrl = () => API_BASE_URL;
 
 // API 함수들
 export const faceAPI = {
@@ -87,6 +92,49 @@ export const faceAPI = {
 
   // 카메라 재시작 (대시보드로 돌아올 때)
   reopenCamera: () => api.post('/api/camera/reopen'),
+
+  // ==================== 출석 API ====================
+
+  // 오늘 출석 현황
+  getAttendanceToday: () => api.get('/api/attendance/today'),
+
+  // 특정 날짜 출석 조회
+  getAttendanceByDate: (date) => api.get(`/api/attendance/date/${date}`),
+
+  // 기간별 출석 조회
+  getAttendanceRange: (startDate, endDate) =>
+    api.get('/api/attendance/range', { params: { start_date: startDate, end_date: endDate } }),
+
+  // 특정 인물 출석 이력
+  getAttendanceByPerson: (name, startDate, endDate) =>
+    api.get(`/api/attendance/person/${encodeURIComponent(name)}`, {
+      params: { start_date: startDate, end_date: endDate }
+    }),
+
+  // 출석 통계
+  getAttendanceStats: (startDate, endDate) =>
+    api.get('/api/attendance/stats', { params: { start_date: startDate, end_date: endDate } }),
+
+  // 출석 기록 삭제
+  deleteAttendance: (id) => api.delete(`/api/attendance/${id}`),
+
+  // ==================== Liveness Detection API ====================
+
+  // Liveness 세션 시작
+  startLivenessSession: () => api.post('/api/liveness/start'),
+
+  // Liveness 검증 (프레임 전송)
+  checkLiveness: (sessionId, imageBlob) => {
+    const formData = new FormData();
+    formData.append('session_id', sessionId);
+    formData.append('file', imageBlob, 'frame.jpg');
+    return api.post('/api/liveness/check', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  // Liveness 세션 상태 조회
+  getLivenessStatus: (sessionId) => api.get(`/api/liveness/status/${sessionId}`),
 };
 
 export default api;

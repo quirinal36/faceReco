@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { faceAPI } from '../services/api';
+import { faceAPI, getApiBaseUrl } from '../services/api';
 
 function FaceList() {
   const { t } = useTranslation();
@@ -149,11 +149,11 @@ function FaceList() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-800">{t('faceList.title')}</h2>
-          <p className="text-gray-600 mt-2">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">{t('faceList.title')}</h2>
+          <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">
             {t('faceList.subtitle', { count: faces.length })}
           </p>
           {duplicateNames.length > 0 && (
@@ -164,7 +164,7 @@ function FaceList() {
         </div>
         <button
           onClick={fetchFaces}
-          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center space-x-2 px-3 py-2 sm:px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -174,7 +174,7 @@ function FaceList() {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          <span>{t('faceList.refresh')}</span>
+          <span className="hidden sm:inline">{t('faceList.refresh')}</span>
         </button>
       </div>
 
@@ -236,7 +236,7 @@ function FaceList() {
           </a>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
           {faces.map((face) => (
             <div
               key={face.face_id}
@@ -245,7 +245,7 @@ function FaceList() {
               <div className="aspect-square bg-gray-100 relative">
                 {face.image_path ? (
                   <img
-                    src={`http://localhost:8000${face.image_path}`}
+                    src={`${getApiBaseUrl()}${face.image_path}`}
                     alt={face.name}
                     className="w-full h-full object-cover"
                   />

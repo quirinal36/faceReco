@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
-function Sidebar() {
+function Sidebar({ isOpen, onClose }) {
   const { t } = useTranslation();
 
   const navItems = [
@@ -62,29 +62,79 @@ function Sidebar() {
         </svg>
       ),
     },
+    {
+      path: '/attendance',
+      name: t('nav.attendance'),
+      icon: (
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+          />
+        </svg>
+      ),
+    },
   ];
 
   return (
-    <aside className="w-64 bg-white shadow-sm min-h-screen">
-      <nav className="p-4 space-y-2">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
-                isActive
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`
-            }
+    <>
+      {/* 모바일 오버레이 배경 */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* 사이드바 */}
+      <aside
+        className={`
+          fixed top-0 left-0 z-50 h-full w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out
+          lg:relative lg:translate-x-0 lg:shadow-sm lg:z-auto
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+      >
+        {/* 모바일: 사이드바 헤더 (닫기 버튼) */}
+        <div className="flex items-center justify-between p-4 border-b lg:hidden">
+          <span className="font-semibold text-gray-800">{t('app.title')}</span>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
           >
-            {item.icon}
-            <span className="font-medium">{item.name}</span>
-          </NavLink>
-        ))}
-      </nav>
-    </aside>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <nav className="p-4 space-y-2">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`
+              }
+            >
+              {item.icon}
+              <span className="font-medium">{item.name}</span>
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+    </>
   );
 }
 

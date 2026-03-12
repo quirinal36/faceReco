@@ -6,7 +6,8 @@
   "nav": {
     "dashboard": "Dashboard",
     "register": "Face Registration",
-    "faceList": "Face List"
+    "faceList": "Face List",
+    "attendance": "Attendance"
   },
   "dashboard": {
     "title": "Real-time Camera Monitoring",
@@ -25,6 +26,11 @@
       "title": "System Information",
       "description": "If the real-time camera feed is not displayed, make sure the backend server is running.",
       "serverCommand": "cd backend && python server.py"
+    },
+    "faceInfo": {
+      "title": "Detected Faces",
+      "unknown": "Unknown",
+      "age": "Age {{age}}"
     }
   },
   "registration": {
@@ -94,6 +100,36 @@
       "deleteFailed": "Failed to delete face",
       "addSampleFailed": "Failed to add sample",
       "mergeFailed": "Failed to merge faces"
+    }
+  },
+  "attendance": {
+    "title": "Attendance",
+    "subtitle": "Check automatic attendance status via face recognition",
+    "today": "Today",
+    "todayBadge": "Today",
+    "loading": "Loading...",
+    "tabs": {
+      "daily": "Daily",
+      "stats": "Statistics"
+    },
+    "summary": {
+      "attended": "Attended",
+      "registered": "Registered"
+    },
+    "records": {
+      "title": "Attendance Records",
+      "name": "Name",
+      "time": "Time",
+      "confidence": "Confidence",
+      "empty": "No attendance records"
+    },
+    "stats": {
+      "days": "Last {{count}} days",
+      "totalDays": "Days with Attendance",
+      "totalRecords": "Total Records",
+      "byPerson": "Attendance by Person",
+      "noData": "No attendance data for this period",
+      "timesUnit": " times"
     }
   },
   "common": {

@@ -9,7 +9,8 @@ function Dashboard() {
   const [stats, setStats] = useState({
     faces_detected: 0,
     faces_recognized: 0,
-    fps: 0
+    fps: 0,
+    recognized_faces: []
   });
   const streamUrl = faceAPI.getCameraStreamUrl();
 
@@ -37,7 +38,8 @@ function Dashboard() {
         setStats({
           faces_detected: response.data.faces_detected,
           faces_recognized: response.data.faces_recognized,
-          fps: response.data.fps
+          fps: response.data.fps,
+          recognized_faces: response.data.recognized_faces || []
         });
       } catch (error) {
         // 통계 가져오기 실패 시 무시 (스트림이 시작되지 않았을 수 있음)
@@ -72,13 +74,13 @@ function Dashboard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-gray-800">{t('dashboard.title')}</h2>
-        <p className="text-gray-600 mt-2">{t('dashboard.subtitle')}</p>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">{t('dashboard.title')}</h2>
+        <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">{t('dashboard.subtitle')}</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-gray-800">{t('dashboard.cameraFeed')}</h3>
@@ -131,12 +133,12 @@ function Dashboard() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mt-6">
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6">
+            <div className="bg-blue-50 rounded-lg p-2 sm:p-4">
+              <div className="flex flex-col sm:flex-row items-center sm:space-x-3 text-center sm:text-left">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0 mb-1 sm:mb-0">
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-4 h-4 sm:w-6 sm:h-6 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -150,19 +152,19 @@ function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">{t('dashboard.stats.detected')}</p>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-xs sm:text-sm text-gray-600">{t('dashboard.stats.detected')}</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-800">
                     {isStreaming ? stats.faces_detected : '-'}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-green-50 rounded-lg p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+            <div className="bg-green-50 rounded-lg p-2 sm:p-4">
+              <div className="flex flex-col sm:flex-row items-center sm:space-x-3 text-center sm:text-left">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mb-1 sm:mb-0">
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-4 h-4 sm:w-6 sm:h-6 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -176,19 +178,19 @@ function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">{t('dashboard.stats.recognized')}</p>
-                  <p className="text-2xl font-bold text-gray-800">
+                  <p className="text-xs sm:text-sm text-gray-600">{t('dashboard.stats.recognized')}</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-800">
                     {isStreaming ? stats.faces_recognized : '-'}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-purple-50 rounded-lg p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center">
+            <div className="bg-purple-50 rounded-lg p-2 sm:p-4">
+              <div className="flex flex-col sm:flex-row items-center sm:space-x-3 text-center sm:text-left">
+                <div className="w-8 h-8 sm:w-12 sm:h-12 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0 mb-1 sm:mb-0">
                   <svg
-                    className="w-6 h-6 text-white"
+                    className="w-4 h-4 sm:w-6 sm:h-6 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -202,9 +204,9 @@ function Dashboard() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">{t('dashboard.stats.fps')}</p>
-                  <p className="text-2xl font-bold text-gray-800">
-                    {isStreaming ? `${stats.fps} FPS` : '- FPS'}
+                  <p className="text-xs sm:text-sm text-gray-600">{t('dashboard.stats.fps')}</p>
+                  <p className="text-lg sm:text-2xl font-bold text-gray-800">
+                    {isStreaming ? `${stats.fps}` : '-'}
                   </p>
                 </div>
               </div>
@@ -213,7 +215,45 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      {/* 인식된 얼굴 정보 패널 (모바일에서 큰 글씨로 표시) */}
+      {isStreaming && stats.recognized_faces.length > 0 && (
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3">
+            {t('dashboard.faceInfo.title')}
+          </h3>
+          <div className="space-y-3">
+            {stats.recognized_faces.map((face, index) => (
+              <div
+                key={index}
+                className={`rounded-lg p-3 sm:p-4 border-l-4 ${
+                  face.name === 'Unknown'
+                    ? 'bg-red-50 border-red-500'
+                    : 'bg-green-50 border-green-500'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xl sm:text-2xl font-bold ${
+                    face.name === 'Unknown' ? 'text-red-700' : 'text-green-700'
+                  }`}>
+                    {face.name === 'Unknown' ? t('dashboard.faceInfo.unknown') : face.name}
+                  </span>
+                  {face.confidence && (
+                    <span className="text-sm sm:text-base font-medium text-gray-500">
+                      {Math.round(face.confidence * 100)}%
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-3 mt-1 text-base sm:text-lg text-gray-600">
+                  {face.gender && <span>{face.gender}</span>}
+                  {face.age && <span>{t('dashboard.faceInfo.age', { age: face.age })}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4 hidden sm:block">
         <div className="flex items-start space-x-3">
           <svg
             className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"

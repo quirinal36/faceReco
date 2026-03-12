@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 
 # API 라우트 import
-from api.routes import router, cleanup_resources
+from api.routes import router, cleanup_resources, get_attendance_db
 
 
 # ==================== 애플리케이션 라이프사이클 ====================
@@ -36,6 +36,10 @@ async def lifespan(app: FastAPI):
 
     # Initial load (dependencies will be initialized automatically)
     print("API routes loaded successfully")
+
+    # 출석 데이터베이스 초기화
+    get_attendance_db()
+    print("Attendance database initialized")
 
     yield
 
@@ -59,20 +63,11 @@ app = FastAPI(
 
 # ==================== CORS 설정 ====================
 
-# CORS 허용 오리진 (프론트엔드 개발 시 필요)
-origins = [
-    "http://localhost:3000",  # React 기본 포트
-    "http://localhost:5173",  # Vite 기본 포트
-    "http://localhost:8080",  # Vue.js 기본 포트
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-    "http://127.0.0.1:8080",
-]
-
+# CORS 허용 (모바일 등 외부 기기에서의 접근 허용)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # 허용할 오리진
-    allow_credentials=True,  # 쿠키 포함 허용
+    allow_origins=["*"],  # 모든 오리진 허용 (개발 환경)
+    allow_credentials=False,  # allow_origins=["*"]일 때 credentials은 False
     allow_methods=["*"],  # 모든 HTTP 메서드 허용
     allow_headers=["*"],  # 모든 헤더 허용
 )

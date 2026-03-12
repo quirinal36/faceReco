@@ -4,14 +4,14 @@ FastAPI 라우트 정의
 얼굴 인식 시스템 API 엔드포인트
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from pydantic import BaseModel
 import cv2
 import numpy as np
 import io
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from PIL import ImageFont, ImageDraw, Image
 from utils.text_utils import put_korean_text, get_text_size
 
@@ -22,6 +22,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.face_recognition import FaceRecognizer
 from models.face_database import FaceDatabase
+from models.attendance_db import AttendanceDB
+from models.liveness import LivenessDetector
 from camera.camera_handler import CameraHandler
 
 
@@ -89,12 +91,104 @@ class HealthResponse(BaseModel):
     database_info: dict
 
 
+class RecognizedFaceInfo(BaseModel):
+    """인식된 얼굴 정보 (프론트엔드 표시용)"""
+    name: str
+    confidence: Optional[float] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+
+
 class CameraStatsResponse(BaseModel):
     """카메라 통계 응답 모델"""
     faces_detected: int
     faces_recognized: int
     fps: float
     last_updated: str
+    recognized_faces: List[RecognizedFaceInfo] = []
+    today_attendance_count: int = 0
+
+
+# ==================== 출석 관련 모델 ====================
+
+class AttendanceRecord(BaseModel):
+    """출석 기록 모델"""
+    id: int
+    face_id: str
+    name: str
+    date: str
+    time: str
+    confidence: Optional[float] = None
+    created_at: Optional[str] = None
+
+
+class AttendanceListResponse(BaseModel):
+    """출석 목록 응답 모델"""
+    date: Optional[str] = None
+    total: int
+    records: List[AttendanceRecord]
+
+
+class AttendanceStatsResponse(BaseModel):
+    """출석 통계 응답 모델"""
+    start_date: str
+    end_date: str
+    total_days: int
+    total_records: int
+    by_person: List[dict]
+
+
+class AttendanceDeleteResponse(BaseModel):
+    """출석 삭제 응답 모델"""
+    success: bool
+    message: str
+
+
+# ==================== Liveness 관련 모델 ====================
+
+class ChallengeInfo(BaseModel):
+    """챌린지 정보"""
+    index: int
+    target_angle: float
+    status: str
+    expected_yaw: float
+    expected_pitch: float
+    last_measured_yaw: Optional[float] = None
+    last_measured_pitch: Optional[float] = None
+
+
+class LivenessSessionResponse(BaseModel):
+    """Liveness 세션 응답"""
+    session_id: str
+    status: str
+    current_challenge_index: int
+    total_challenges: int
+    passed_count: int
+    challenges: List[ChallengeInfo]
+    timeout: float
+    elapsed: float
+    face_id: Optional[str] = None
+    face_name: Optional[str] = None
+
+
+class LivenessCheckResponse(BaseModel):
+    """Liveness 검증 결과"""
+    challenge_passed: bool
+    session_completed: bool
+    message: str
+    current_challenge_index: Optional[int] = None
+    total_challenges: Optional[int] = None
+    yaw_diff: Optional[float] = None
+    pitch_diff: Optional[float] = None
+    measured_yaw: Optional[float] = None
+    measured_pitch: Optional[float] = None
+    expected_yaw: Optional[float] = None
+    expected_pitch: Optional[float] = None
+    next_target_angle: Optional[float] = None
+    error: Optional[str] = None
+    face_id: Optional[str] = None
+    face_name: Optional[str] = None
+    face_confidence: Optional[float] = None
 
 
 # ==================== 의존성 ====================
@@ -103,6 +197,12 @@ class CameraStatsResponse(BaseModel):
 _face_recognizer: Optional[FaceRecognizer] = None
 _face_database: Optional[FaceDatabase] = None
 _camera_handler: Optional[CameraHandler] = None
+_attendance_db: Optional[AttendanceDB] = None
+_liveness_detector: Optional[LivenessDetector] = None
+
+# 출석 캐시 (당일 출석 완료된 face_id 집합, DB 조회 최소화)
+_today_attendance_cache: set = set()
+_cache_date: str = date.today().strftime('%Y-%m-%d')
 
 # 실시간 통계 (카메라 스트림용)
 _camera_stats = {
@@ -111,7 +211,9 @@ _camera_stats = {
     'fps': 0.0,
     'last_updated': datetime.now().isoformat(),
     'frame_count': 0,
-    'start_time': datetime.now()
+    'start_time': datetime.now(),
+    'recognized_faces': [],
+    'today_attendance_count': 0
 }
 
 
@@ -138,6 +240,27 @@ def get_camera_handler() -> CameraHandler:
         _camera_handler = CameraHandler(camera_id=0)
         _camera_handler.open()
     return _camera_handler
+
+
+def get_attendance_db() -> AttendanceDB:
+    """출석 데이터베이스 의존성"""
+    global _attendance_db
+    if _attendance_db is None:
+        _attendance_db = AttendanceDB()
+    return _attendance_db
+
+
+def get_liveness_detector() -> LivenessDetector:
+    """Liveness 검출기 의존성"""
+    global _liveness_detector
+    if _liveness_detector is None:
+        _liveness_detector = LivenessDetector(
+            num_challenges=2,
+            session_timeout=60.0,
+            yaw_tolerance=15.0,
+            pitch_tolerance=15.0,
+        )
+    return _liveness_detector
 
 
 # ==================== 라우터 ====================
@@ -455,6 +578,38 @@ async def merge_faces(
 
 # ==================== 실시간 비디오 스트리밍 ====================
 
+def _record_attendance_if_needed(face_id: str, name: str, confidence: float) -> None:
+    """
+    출석 기록 처리 (캐시 + DB)
+
+    메모리 캐시로 당일 중복 DB 조회를 방지하고,
+    DB의 UNIQUE 제약조건으로 최종 방어합니다.
+    """
+    global _today_attendance_cache, _cache_date, _attendance_db, _camera_stats
+
+    # 날짜 변경 감지 → 캐시 리셋
+    today = date.today().strftime('%Y-%m-%d')
+    if _cache_date != today:
+        _today_attendance_cache = set()
+        _cache_date = today
+
+    # 이미 캐시에 있으면 스킵
+    if face_id in _today_attendance_cache:
+        return
+
+    # DB에 출석 기록
+    try:
+        attendance_db = get_attendance_db()
+        recorded = attendance_db.record_attendance(face_id, name, confidence)
+        # 캐시에 추가 (DB 기록 성공 여부와 관계없이, 이미 기록된 경우도 포함)
+        _today_attendance_cache.add(face_id)
+        if recorded:
+            _camera_stats['today_attendance_count'] = attendance_db.get_today_count()
+            print(f"출석 기록: {name} ({face_id}) - 신뢰도: {confidence:.2f}")
+    except Exception as e:
+        print(f"출석 기록 실패: {str(e)}")
+
+
 def _format_age_gender(age, gender) -> str:
     """나이와 성별 정보를 표시 문자열로 변환"""
     if age is None and gender is None:
@@ -491,6 +646,7 @@ def generate_frames(
         # 통계 업데이트
         _camera_stats['faces_detected'] = len(results)
         recognized_count = 0
+        current_faces = []
 
         for face_result in results:
             bbox = face_result['bbox']
@@ -508,6 +664,9 @@ def generate_frames(
                 face_data = database.faces.get(face_id)
                 name = face_data['metadata'].get('name', 'Unknown') if face_data else 'Unknown'
 
+                # 출석 기록 처리
+                _record_attendance_if_needed(face_id, name, confidence)
+
                 # 녹색 박스 (인식됨)
                 color = (0, 255, 0)
                 label = f"{name} ({confidence:.2f})"
@@ -515,11 +674,24 @@ def generate_frames(
                 # 빨간색 박스 (미등록)
                 color = (0, 0, 255)
                 label = "Unknown"
+                name = "Unknown"
+                confidence = None
 
             # 나이/성별 정보 추가
             age_gender_str = _format_age_gender(age, gender)
             if age_gender_str:
                 label = f"{label} {age_gender_str}"
+
+            # 프론트엔드 표시용 얼굴 정보 수집
+            gender_str = None
+            if gender is not None:
+                gender_str = "남성" if gender == 1 else "여성"
+            current_faces.append({
+                'name': name,
+                'confidence': round(confidence, 2) if confidence is not None else None,
+                'age': int(age) if age is not None else None,
+                'gender': gender_str,
+            })
 
             # 박스 그리기
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
@@ -545,8 +717,9 @@ def generate_frames(
                 color=(255, 255, 255),
             )
 
-        # 통계 업데이트 (인식 성공 수)
+        # 통계 업데이트 (인식 성공 수 및 얼굴 상세 정보)
         _camera_stats['faces_recognized'] = recognized_count
+        _camera_stats['recognized_faces'] = current_faces
 
         # FPS 계산
         _camera_stats['frame_count'] += 1
@@ -603,7 +776,11 @@ async def get_camera_stats():
         faces_detected=_camera_stats['faces_detected'],
         faces_recognized=_camera_stats['faces_recognized'],
         fps=round(_camera_stats['fps'], 1),
-        last_updated=_camera_stats['last_updated']
+        last_updated=_camera_stats['last_updated'],
+        recognized_faces=[
+            RecognizedFaceInfo(**f) for f in _camera_stats.get('recognized_faces', [])
+        ],
+        today_attendance_count=_camera_stats.get('today_attendance_count', 0)
     )
 
 
@@ -646,6 +823,243 @@ async def reopen_camera():
 
     except Exception as e:
         return {"success": False, "message": f"카메라 시작 실패: {str(e)}"}
+
+
+# ==================== 출석 API ====================
+
+@router.get("/attendance/today", response_model=AttendanceListResponse)
+async def get_today_attendance(
+    attendance_db: AttendanceDB = Depends(get_attendance_db)
+):
+    """오늘 출석 현황 조회"""
+    records = attendance_db.get_today_attendance()
+    today = date.today().strftime('%Y-%m-%d')
+    return AttendanceListResponse(
+        date=today,
+        total=len(records),
+        records=[AttendanceRecord(**r) for r in records]
+    )
+
+
+@router.get("/attendance/date/{target_date}", response_model=AttendanceListResponse)
+async def get_attendance_by_date(
+    target_date: str,
+    attendance_db: AttendanceDB = Depends(get_attendance_db)
+):
+    """특정 날짜 출석 조회"""
+    try:
+        datetime.strptime(target_date, '%Y-%m-%d')
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)")
+
+    records = attendance_db.get_attendance_by_date(target_date)
+    return AttendanceListResponse(
+        date=target_date,
+        total=len(records),
+        records=[AttendanceRecord(**r) for r in records]
+    )
+
+
+@router.get("/attendance/range", response_model=AttendanceListResponse)
+async def get_attendance_range(
+    start_date: str = Query(..., description="시작 날짜 (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="종료 날짜 (YYYY-MM-DD)"),
+    attendance_db: AttendanceDB = Depends(get_attendance_db)
+):
+    """기간별 출석 조회"""
+    try:
+        datetime.strptime(start_date, '%Y-%m-%d')
+        datetime.strptime(end_date, '%Y-%m-%d')
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)")
+
+    records = attendance_db.get_attendance_range(start_date, end_date)
+    return AttendanceListResponse(
+        total=len(records),
+        records=[AttendanceRecord(**r) for r in records]
+    )
+
+
+@router.get("/attendance/person/{name}", response_model=AttendanceListResponse)
+async def get_attendance_by_person(
+    name: str,
+    start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    attendance_db: AttendanceDB = Depends(get_attendance_db)
+):
+    """특정 인물 출석 이력 조회"""
+    records = attendance_db.get_attendance_by_name(name, start_date, end_date)
+    return AttendanceListResponse(
+        total=len(records),
+        records=[AttendanceRecord(**r) for r in records]
+    )
+
+
+@router.get("/attendance/stats", response_model=AttendanceStatsResponse)
+async def get_attendance_stats(
+    start_date: str = Query(..., description="시작 날짜 (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="종료 날짜 (YYYY-MM-DD)"),
+    attendance_db: AttendanceDB = Depends(get_attendance_db)
+):
+    """출석 통계 조회"""
+    try:
+        datetime.strptime(start_date, '%Y-%m-%d')
+        datetime.strptime(end_date, '%Y-%m-%d')
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)")
+
+    stats = attendance_db.get_attendance_stats(start_date, end_date)
+    return AttendanceStatsResponse(**stats)
+
+
+@router.delete("/attendance/{record_id}", response_model=AttendanceDeleteResponse)
+async def delete_attendance(
+    record_id: int,
+    attendance_db: AttendanceDB = Depends(get_attendance_db)
+):
+    """출석 기록 삭제"""
+    success = attendance_db.delete_attendance(record_id)
+    if success:
+        return AttendanceDeleteResponse(
+            success=True,
+            message=f"출석 기록 ID {record_id}가 삭제되었습니다."
+        )
+    else:
+        raise HTTPException(status_code=404, detail=f"출석 기록 ID {record_id}를 찾을 수 없습니다.")
+
+
+# ==================== Liveness Detection API ====================
+
+@router.post("/liveness/start", response_model=LivenessSessionResponse)
+async def start_liveness_session(
+    liveness: LivenessDetector = Depends(get_liveness_detector),
+):
+    """
+    Liveness 검증 세션 시작
+
+    2개의 챌린지(서로 반대 방향)를 생성하고 세션을 반환합니다.
+    프론트엔드는 각 챌린지의 target_angle을 사용하여 타원 위에 점을 표시합니다.
+
+    Returns:
+        세션 정보 (session_id, 챌린지 목록 등)
+    """
+    session = liveness.create_session()
+    info = liveness.get_session_info(session.session_id)
+    return LivenessSessionResponse(**info)
+
+
+@router.post("/liveness/check", response_model=LivenessCheckResponse)
+async def check_liveness(
+    session_id: str = Form(...),
+    file: UploadFile = File(...),
+    recognizer: FaceRecognizer = Depends(get_face_recognizer),
+    database: FaceDatabase = Depends(get_face_database),
+    liveness: LivenessDetector = Depends(get_liveness_detector),
+):
+    """
+    Liveness 검증: 프레임 전송 + Head Pose 검증
+
+    프론트엔드에서 웹캠 프레임을 전송하면:
+    1. 얼굴 감지 + 임베딩 추출 + Head Pose 추출
+    2. 얼굴 인식 (DB 매칭)
+    3. Head Pose와 현재 챌린지의 기대 방향 비교
+    4. 일치하면 챌린지 통과
+
+    Args:
+        session_id: Liveness 세션 ID
+        file: 웹캠 프레임 이미지
+
+    Returns:
+        검증 결과 (통과 여부, 세션 완료 여부, 측정값 등)
+    """
+    # 이미지 디코딩
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if image is None:
+        raise HTTPException(status_code=400, detail="유효하지 않은 이미지입니다.")
+
+    # 얼굴 감지 + 임베딩 + Head Pose 추출
+    results = recognizer.detect_and_extract(image)
+
+    if not results:
+        return LivenessCheckResponse(
+            challenge_passed=False,
+            session_completed=False,
+            message="얼굴을 감지할 수 없습니다. 카메라를 확인해주세요.",
+            error="no_face_detected",
+        )
+
+    # 첫 번째 얼굴 사용
+    face = results[0]
+    pose = face.get('pose')
+
+    if pose is None or len(pose) < 3:
+        return LivenessCheckResponse(
+            challenge_passed=False,
+            session_completed=False,
+            message="Head Pose를 추출할 수 없습니다.",
+            error="no_pose_detected",
+        )
+
+    yaw, pitch, roll = pose[0], pose[1], pose[2]
+
+    # 얼굴 인식 (DB 매칭)
+    face_id = None
+    face_name = None
+    face_confidence = None
+
+    embedding = face.get('embedding')
+    if embedding is not None:
+        match = database.recognize_face(embedding)
+        if match:
+            face_id, face_confidence = match
+            face_data = database.faces.get(face_id)
+            if face_data:
+                face_name = face_data['metadata'].get('name', 'Unknown')
+
+    # Head Pose 검증
+    result = liveness.check_pose(
+        session_id=session_id,
+        yaw=yaw,
+        pitch=pitch,
+        roll=roll,
+        face_id=face_id,
+        face_name=face_name,
+        face_confidence=face_confidence,
+    )
+
+    # 세션 완료 시 출석 기록
+    if result.get("session_completed") and face_id and face_name:
+        _record_attendance_if_needed(face_id, face_name, face_confidence or 0.0)
+
+    # 응답에 얼굴 정보 추가
+    result["face_id"] = face_id
+    result["face_name"] = face_name
+    result["face_confidence"] = round(face_confidence, 2) if face_confidence else None
+
+    return LivenessCheckResponse(**result)
+
+
+@router.get("/liveness/status/{session_id}", response_model=LivenessSessionResponse)
+async def get_liveness_status(
+    session_id: str,
+    liveness: LivenessDetector = Depends(get_liveness_detector),
+):
+    """
+    Liveness 세션 상태 조회
+
+    Args:
+        session_id: 세션 ID
+
+    Returns:
+        세션 상태 정보
+    """
+    info = liveness.get_session_info(session_id)
+    if info is None:
+        raise HTTPException(status_code=404, detail="세션을 찾을 수 없습니다.")
+    return LivenessSessionResponse(**info)
 
 
 # ==================== 정리 함수 ====================

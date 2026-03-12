@@ -6,7 +6,8 @@
   "nav": {
     "dashboard": "대시보드",
     "register": "얼굴 등록",
-    "faceList": "얼굴 목록"
+    "faceList": "얼굴 목록",
+    "attendance": "출석체크"
   },
   "dashboard": {
     "title": "실시간 카메라 모니터링",
@@ -25,6 +26,11 @@
       "title": "시스템 안내",
       "description": "실시간 카메라 피드가 표시되지 않는 경우, 백엔드 서버가 실행 중인지 확인하세요.",
       "serverCommand": "cd backend && python server.py"
+    },
+    "faceInfo": {
+      "title": "감지된 얼굴 정보",
+      "unknown": "미등록",
+      "age": "{{age}}세"
     }
   },
   "registration": {
@@ -94,6 +100,36 @@
       "deleteFailed": "얼굴 삭제에 실패했습니다",
       "addSampleFailed": "샘플 추가에 실패했습니다",
       "mergeFailed": "얼굴 통합에 실패했습니다"
+    }
+  },
+  "attendance": {
+    "title": "출석체크",
+    "subtitle": "얼굴 인식을 통한 자동 출석 현황을 확인하세요",
+    "today": "오늘",
+    "todayBadge": "오늘",
+    "loading": "로딩 중...",
+    "tabs": {
+      "daily": "일별 출석",
+      "stats": "출석 통계"
+    },
+    "summary": {
+      "attended": "출석 인원",
+      "registered": "등록 인원"
+    },
+    "records": {
+      "title": "출석 기록",
+      "name": "이름",
+      "time": "출석 시간",
+      "confidence": "신뢰도",
+      "empty": "출석 기록이 없습니다"
+    },
+    "stats": {
+      "days": "최근 {{count}}일",
+      "totalDays": "출석 일수",
+      "totalRecords": "총 출석 기록",
+      "byPerson": "인물별 출석 현황",
+      "noData": "해당 기간의 출석 데이터가 없습니다",
+      "timesUnit": "회"
     }
   },
   "common": {
