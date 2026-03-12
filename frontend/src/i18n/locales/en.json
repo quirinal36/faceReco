@@ -7,7 +7,8 @@
     "dashboard": "Dashboard",
     "register": "Face Registration",
     "faceList": "Face List",
-    "attendance": "Attendance"
+    "attendance": "Attendance",
+    "liveness": "Liveness Check"
   },
   "dashboard": {
     "title": "Real-time Camera Monitoring",
@@ -130,6 +131,65 @@
       "byPerson": "Attendance by Person",
       "noData": "No attendance data for this period",
       "timesUnit": " times"
+    }
+  },
+  "liveness": {
+    "title": "Liveness Check Attendance",
+    "subtitle": "Real-time identity verification to prevent photo-based fraud",
+    "startButton": "Start Verification",
+    "directions": {
+      "right": "right",
+      "left": "left",
+      "up": "up",
+      "down": "down"
+    },
+    "messages": {
+      "ready": "Press the button below to start identity verification",
+      "startingCamera": "Starting camera...",
+      "cameraError": "Cannot access camera. Please check permissions.",
+      "creatingSession": "Creating verification session...",
+      "sessionError": "Failed to create session. Please try again.",
+      "turnHead": "Turn your head toward the red dot (A)",
+      "turnMore": "Turn your head a little more",
+      "direction": "Turn your head to the {{direction}}",
+      "challengePassed": "Passed! Now turn toward the next direction",
+      "passed": "Verification complete! Attendance recorded.",
+      "expired": "Time expired. Please try again.",
+      "noFace": "No face detected. Please check the camera.",
+      "noPose": "Cannot detect head direction.",
+      "faceChanged": "A different person was detected during the session. Please try again.",
+      "unnaturalMotion": "Unnatural movement detected. Please try again with your real face.",
+      "tooManyRetries": "Too many attempts. Please try again in 10 minutes."
+    },
+    "guide": {
+      "title": "Verification Steps",
+      "step1Title": "Start Camera",
+      "step1Desc": "Position your face in front of the camera",
+      "step2Title": "First Direction",
+      "step2Desc": "Turn your head toward the red dot (A)",
+      "step3Title": "Second Direction",
+      "step3Desc": "Turn your head toward the next dot",
+      "step4Title": "Verification Complete",
+      "step4Desc": "Attendance is automatically recorded after 2 passes"
+    },
+    "recognized": {
+      "title": "Recognized User",
+      "confidence": "Confidence"
+    },
+    "result": {
+      "passedTitle": "Verification Passed!",
+      "attendanceRecorded": "Your attendance has been recorded",
+      "failedTitle": "Verification Failed",
+      "expiredTitle": "Time Expired",
+      "tryAgain": "Please try again",
+      "done": "Done",
+      "retry": "Try Again"
+    },
+    "info": {
+      "title": "Tips",
+      "tip1": "Position your face within the oval guide",
+      "tip2": "Slowly turn your head toward the red dot",
+      "tip3": "Complete 2 verifications within 60 seconds"
     }
   },
   "common": {

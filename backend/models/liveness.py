@@ -40,6 +40,15 @@ class SessionStatus(str, Enum):
 
 
 @dataclass
+class PoseSnapshot:
+    """연속 프레임의 Head Pose 기록 (움직임 자연스러움 검증용)"""
+    yaw: float
+    pitch: float
+    roll: float
+    timestamp: float
+
+
+@dataclass
 class Challenge:
     """단일 챌린지 (하나의 점 방향으로 고개 돌리기)"""
     # 타원 위의 점(A) 위치 (각도, 0~360도)
@@ -83,6 +92,20 @@ class LivenessSession:
     face_id: Optional[str] = None
     face_name: Optional[str] = None
     face_confidence: Optional[float] = None
+
+    # --- Phase 3: 보안 강화 필드 ---
+    # 연속 프레임 Pose 기록 (움직임 자연스러움 검증)
+    pose_history: List[PoseSnapshot] = field(default_factory=list)
+
+    # 재시도 횟수 (같은 IP/사용자에 대한 제한용)
+    retry_count: int = 0
+
+    # 움직임 점수 (0.0~1.0, 높을수록 자연스러운 움직임)
+    motion_score: float = 0.0
+
+    # face_id 일관성 검증 (세션 중 같은 사람인지)
+    face_id_history: List[str] = field(default_factory=list)
+    face_id_consistent: bool = True
 
     def is_expired(self) -> bool:
         """세션 만료 여부"""
@@ -139,6 +162,9 @@ class LivenessDetector:
         yaw_tolerance: float = 15.0,
         pitch_tolerance: float = 15.0,
         max_sessions: int = 100,
+        max_retries: int = 5,
+        min_motion_score: float = 0.3,
+        max_pose_jump: float = 40.0,
     ):
         """
         Args:
@@ -147,23 +173,39 @@ class LivenessDetector:
             yaw_tolerance: yaw 허용 오차 (degrees)
             pitch_tolerance: pitch 허용 오차 (degrees)
             max_sessions: 최대 동시 세션 수
+            max_retries: 최대 재시도 횟수 (IP/사용자 기반)
+            min_motion_score: 최소 움직임 점수 (통과 조건)
+            max_pose_jump: 연속 프레임 간 최대 허용 Pose 변화 (degrees)
         """
         self.num_challenges = num_challenges
         self.session_timeout = session_timeout
         self.yaw_tolerance = yaw_tolerance
         self.pitch_tolerance = pitch_tolerance
         self.max_sessions = max_sessions
+        self.max_retries = max_retries
+        self.min_motion_score = min_motion_score
+        self.max_pose_jump = max_pose_jump
 
         # 활성 세션 저장소
         self._sessions: Dict[str, LivenessSession] = {}
 
-    def create_session(self) -> LivenessSession:
+        # 재시도 제한 (client_id → {count, first_attempt_time})
+        self._retry_tracker: Dict[str, Dict] = {}
+
+    def create_session(self, client_id: Optional[str] = None) -> Tuple[Optional[LivenessSession], Optional[str]]:
         """
         새 liveness 검증 세션 생성
 
+        Args:
+            client_id: 클라이언트 식별자 (IP 주소 등, 재시도 제한용)
+
         Returns:
-            LivenessSession: 생성된 세션
+            (LivenessSession, error_message) - 성공 시 (session, None), 실패 시 (None, error)
         """
+        # 재시도 제한 확인
+        if client_id and not self.check_retry_limit(client_id):
+            return None, "retry_limit_exceeded"
+
         # 만료된 세션 정리
         self._cleanup_expired_sessions()
 
@@ -184,7 +226,7 @@ class LivenessDetector:
             challenges[0].status = ChallengeStatus.IN_PROGRESS
 
         self._sessions[session_id] = session
-        return session
+        return session, None
 
     def get_session(self, session_id: str) -> Optional[LivenessSession]:
         """세션 조회"""
@@ -195,6 +237,153 @@ class LivenessDetector:
                 if c.status in (ChallengeStatus.PENDING, ChallengeStatus.IN_PROGRESS):
                     c.status = ChallengeStatus.EXPIRED
         return session
+
+    def check_retry_limit(self, client_id: str) -> bool:
+        """
+        재시도 횟수 제한 확인
+
+        Args:
+            client_id: 클라이언트 식별자 (IP 등)
+
+        Returns:
+            True면 시도 가능, False면 제한 초과
+        """
+        now = time.time()
+        tracker = self._retry_tracker.get(client_id)
+
+        if tracker is None:
+            self._retry_tracker[client_id] = {"count": 1, "first_attempt": now}
+            return True
+
+        # 10분 경과 시 리셋
+        if now - tracker["first_attempt"] > 600:
+            self._retry_tracker[client_id] = {"count": 1, "first_attempt": now}
+            return True
+
+        if tracker["count"] >= self.max_retries:
+            return False
+
+        tracker["count"] += 1
+        return True
+
+    def _record_pose(self, session: LivenessSession, yaw: float, pitch: float, roll: float):
+        """Pose 기록 추가 (움직임 분석용)"""
+        snapshot = PoseSnapshot(
+            yaw=yaw, pitch=pitch, roll=roll, timestamp=time.time()
+        )
+        session.pose_history.append(snapshot)
+
+        # 최대 120개 (60초 × 2fps) 유지
+        if len(session.pose_history) > 120:
+            session.pose_history = session.pose_history[-120:]
+
+    def _check_motion_naturalness(self, session: LivenessSession) -> Tuple[bool, float, str]:
+        """
+        연속 프레임 간 움직임이 자연스러운지 검증
+
+        정적 사진은 Pose 값이 거의 변하지 않음.
+        실제 사람은 미세한 흔들림(micro-movement)이 있음.
+
+        Returns:
+            (is_natural, score, reason)
+        """
+        history = session.pose_history
+        if len(history) < 4:
+            # 데이터 부족 - 아직 판단 불가
+            return True, 0.5, "insufficient_data"
+
+        # 최근 N개 프레임 분석
+        recent = history[-min(len(history), 20):]
+
+        yaws = [s.yaw for s in recent]
+        pitches = [s.pitch for s in recent]
+
+        # 1. 움직임 범위 (range) - 사진은 거의 0에 가까움
+        yaw_range = max(yaws) - min(yaws)
+        pitch_range = max(pitches) - min(pitches)
+        total_range = yaw_range + pitch_range
+
+        # 2. 연속 프레임 간 변화량 (delta) 분석
+        deltas = []
+        for i in range(1, len(recent)):
+            dy = abs(recent[i].yaw - recent[i - 1].yaw)
+            dp = abs(recent[i].pitch - recent[i - 1].pitch)
+            deltas.append(dy + dp)
+
+        avg_delta = sum(deltas) / len(deltas) if deltas else 0
+
+        # 3. 급격한 점프 감지 (사진 교체 등)
+        has_jump = any(d > self.max_pose_jump for d in deltas)
+
+        # 점수 계산
+        # - total_range가 2도 미만이면 정적 (사진 가능성 높음)
+        # - avg_delta가 0.5 미만이면 너무 안정적 (사진 가능성)
+        # - 점프가 있으면 부자연스러움
+
+        score = 0.0
+
+        # 범위 점수 (0~0.5)
+        if total_range >= 5.0:
+            score += 0.5
+        elif total_range >= 2.0:
+            score += 0.3
+        else:
+            score += 0.1
+
+        # 미세 움직임 점수 (0~0.3)
+        if avg_delta >= 1.0:
+            score += 0.3
+        elif avg_delta >= 0.3:
+            score += 0.2
+        else:
+            score += 0.0
+
+        # 점프 페널티
+        if has_jump:
+            score -= 0.2
+
+        # 변화량 분산 (자연스러운 움직임은 일정하지 않음) (0~0.2)
+        if len(deltas) >= 3:
+            delta_std = np.std(deltas)
+            if delta_std > 0.5:
+                score += 0.2
+            elif delta_std > 0.2:
+                score += 0.1
+
+        score = max(0.0, min(1.0, score))
+        session.motion_score = score
+
+        if has_jump:
+            return False, score, "unnatural_jump"
+
+        is_natural = score >= self.min_motion_score
+        reason = "ok" if is_natural else "too_static"
+        return is_natural, score, reason
+
+    def _check_face_consistency(self, session: LivenessSession, face_id: Optional[str]) -> bool:
+        """
+        세션 중 동일인물인지 검증
+
+        세션 도중 다른 사람으로 바뀌면 부정행위 가능성.
+        """
+        if face_id is None:
+            return True  # 인식 안 된 프레임은 무시
+
+        session.face_id_history.append(face_id)
+
+        # 최소 3개 이상의 face_id가 기록된 후 판단
+        if len(session.face_id_history) < 3:
+            return True
+
+        # 가장 많이 나온 face_id 비율
+        from collections import Counter
+        counter = Counter(session.face_id_history)
+        most_common_id, most_common_count = counter.most_common(1)[0]
+
+        consistency_ratio = most_common_count / len(session.face_id_history)
+        session.face_id_consistent = consistency_ratio >= 0.7
+
+        return session.face_id_consistent
 
     def check_pose(
         self,
@@ -209,23 +398,22 @@ class LivenessDetector:
         """
         Head Pose를 검증하여 현재 챌린지 통과 여부를 판정
 
+        Phase 3 보안 강화:
+        - 연속 프레임 움직임 자연스러움 검증
+        - face_id 일관성 검증 (동일인물 확인)
+        - 움직임 점수(motion_score) 기반 최종 판정
+
         Args:
             session_id: 세션 ID
             yaw: 측정된 yaw 값 (좌우 회전, degrees)
             pitch: 측정된 pitch 값 (상하 회전, degrees)
-            roll: 측정된 roll 값 (기울기, degrees) - 참고용
+            roll: 측정된 roll 값 (기울기, degrees)
             face_id: 인식된 얼굴 ID (optional)
             face_name: 인식된 이름 (optional)
             face_confidence: 인식 신뢰도 (optional)
 
         Returns:
             Dict: 검증 결과
-                - challenge_passed: 현재 챌린지 통과 여부
-                - session_completed: 모든 챌린지 완료 여부
-                - message: 결과 메시지
-                - current_challenge_index: 현재 챌린지 인덱스
-                - yaw_diff: yaw 차이
-                - pitch_diff: pitch 차이
         """
         session = self.get_session(session_id)
         if session is None:
@@ -259,6 +447,20 @@ class LivenessDetector:
                 "error": "session_failed",
             }
 
+        # --- Pose 기록 (움직임 분석용) ---
+        self._record_pose(session, yaw, pitch, roll)
+
+        # --- face_id 일관성 검증 ---
+        if not self._check_face_consistency(session, face_id):
+            session.status = SessionStatus.FAILED
+            return {
+                "challenge_passed": False,
+                "session_completed": False,
+                "message": "세션 중 다른 사람이 감지되었습니다. 다시 시작해주세요.",
+                "error": "face_inconsistent",
+                "motion_score": session.motion_score,
+            }
+
         # 얼굴 정보 업데이트
         if face_id:
             session.face_id = face_id
@@ -290,6 +492,9 @@ class LivenessDetector:
             pitch_diff <= challenge.pitch_tolerance
         )
 
+        # --- 움직임 자연스러움 검증 ---
+        motion_natural, motion_score, motion_reason = self._check_motion_naturalness(session)
+
         result = {
             "challenge_passed": challenge_passed,
             "session_completed": False,
@@ -301,6 +506,7 @@ class LivenessDetector:
             "measured_pitch": round(pitch, 1),
             "expected_yaw": challenge.expected_yaw,
             "expected_pitch": challenge.expected_pitch,
+            "motion_score": round(motion_score, 2),
         }
 
         if challenge_passed:
@@ -311,11 +517,22 @@ class LivenessDetector:
             session.current_challenge_index += 1
 
             if session.current_challenge_index >= session.total_challenges:
-                # 모든 챌린지 통과
-                session.status = SessionStatus.COMPLETED
-                session.completed_at = time.time()
-                result["session_completed"] = True
-                result["message"] = "Liveness 검증 완료! 출석이 인정됩니다."
+                # --- 최종 검증: 움직임 자연스러움 ---
+                if not motion_natural:
+                    session.status = SessionStatus.FAILED
+                    result["challenge_passed"] = False
+                    result["session_completed"] = False
+                    result["message"] = (
+                        "부자연스러운 움직임이 감지되었습니다. "
+                        "실제 얼굴로 다시 시도해주세요."
+                    )
+                    result["error"] = f"motion_{motion_reason}"
+                else:
+                    # 모든 챌린지 통과 + 움직임 검증 통과
+                    session.status = SessionStatus.COMPLETED
+                    session.completed_at = time.time()
+                    result["session_completed"] = True
+                    result["message"] = "Liveness 검증 완료! 출석이 인정됩니다."
             else:
                 # 다음 챌린지 시작
                 next_challenge = session.current_challenge
@@ -327,7 +544,11 @@ class LivenessDetector:
                 )
                 result["next_target_angle"] = next_challenge.target_angle if next_challenge else None
         else:
-            result["message"] = "고개를 조금 더 돌려주세요."
+            # 부자연스러운 점프 감지 시 경고
+            if motion_reason == "unnatural_jump":
+                result["message"] = "급격한 움직임이 감지되었습니다. 천천히 고개를 돌려주세요."
+            else:
+                result["message"] = "고개를 조금 더 돌려주세요."
 
         return result
 
@@ -439,4 +660,6 @@ class LivenessDetector:
             "elapsed": round(time.time() - session.created_at, 1),
             "face_id": session.face_id,
             "face_name": session.face_name,
+            "motion_score": round(session.motion_score, 2),
+            "face_id_consistent": session.face_id_consistent,
         }

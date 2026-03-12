@@ -4,7 +4,7 @@ FastAPI 라우트 정의
 얼굴 인식 시스템 API 엔드포인트
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from typing import List, Optional
 from pydantic import BaseModel
@@ -169,6 +169,8 @@ class LivenessSessionResponse(BaseModel):
     elapsed: float
     face_id: Optional[str] = None
     face_name: Optional[str] = None
+    motion_score: float = 0.0
+    face_id_consistent: bool = True
 
 
 class LivenessCheckResponse(BaseModel):
@@ -189,6 +191,7 @@ class LivenessCheckResponse(BaseModel):
     face_id: Optional[str] = None
     face_name: Optional[str] = None
     face_confidence: Optional[float] = None
+    motion_score: Optional[float] = None
 
 
 # ==================== 의존성 ====================
@@ -932,6 +935,7 @@ async def delete_attendance(
 
 @router.post("/liveness/start", response_model=LivenessSessionResponse)
 async def start_liveness_session(
+    request: Request,
     liveness: LivenessDetector = Depends(get_liveness_detector),
 ):
     """
@@ -939,11 +943,23 @@ async def start_liveness_session(
 
     2개의 챌린지(서로 반대 방향)를 생성하고 세션을 반환합니다.
     프론트엔드는 각 챌린지의 target_angle을 사용하여 타원 위에 점을 표시합니다.
+    IP 기반 재시도 횟수를 제한합니다 (10분 내 최대 5회).
 
     Returns:
         세션 정보 (session_id, 챌린지 목록 등)
     """
-    session = liveness.create_session()
+    client_id = request.client.host if request.client else "unknown"
+    session, error = liveness.create_session(client_id=client_id)
+
+    if error == "retry_limit_exceeded":
+        raise HTTPException(
+            status_code=429,
+            detail="너무 많은 시도입니다. 10분 후에 다시 시도해주세요."
+        )
+
+    if session is None:
+        raise HTTPException(status_code=500, detail="세션 생성에 실패했습니다.")
+
     info = liveness.get_session_info(session.session_id)
     return LivenessSessionResponse(**info)
 

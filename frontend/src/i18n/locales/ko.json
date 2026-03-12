@@ -7,7 +7,8 @@
     "dashboard": "대시보드",
     "register": "얼굴 등록",
     "faceList": "얼굴 목록",
-    "attendance": "출석체크"
+    "attendance": "출석체크",
+    "liveness": "본인 인증 출석"
   },
   "dashboard": {
     "title": "실시간 카메라 모니터링",
@@ -130,6 +131,65 @@
       "byPerson": "인물별 출석 현황",
       "noData": "해당 기간의 출석 데이터가 없습니다",
       "timesUnit": "회"
+    }
+  },
+  "liveness": {
+    "title": "본인 인증 출석",
+    "subtitle": "사진 도용 방지를 위해 실시간 본인 인증 후 출석이 기록됩니다",
+    "startButton": "본인 인증 시작",
+    "directions": {
+      "right": "오른쪽",
+      "left": "왼쪽",
+      "up": "위쪽",
+      "down": "아래쪽"
+    },
+    "messages": {
+      "ready": "본인 인증을 시작하려면 아래 버튼을 눌러주세요",
+      "startingCamera": "카메라를 시작하는 중...",
+      "cameraError": "카메라에 접근할 수 없습니다. 권한을 확인해주세요.",
+      "creatingSession": "인증 세션을 생성하는 중...",
+      "sessionError": "세션 생성에 실패했습니다. 다시 시도해주세요.",
+      "turnHead": "빨간 점(A) 방향으로 고개를 돌려주세요",
+      "turnMore": "조금 더 고개를 돌려주세요",
+      "direction": "{{direction}} 방향으로 고개를 돌려주세요",
+      "challengePassed": "통과! 다음 방향으로 고개를 돌려주세요",
+      "passed": "본인 인증 완료! 출석이 기록되었습니다",
+      "expired": "시간이 초과되었습니다. 다시 시도해주세요.",
+      "noFace": "얼굴이 감지되지 않습니다. 카메라를 확인해주세요.",
+      "noPose": "얼굴 방향을 인식할 수 없습니다.",
+      "faceChanged": "세션 중 다른 사람이 감지되었습니다. 다시 시도해주세요.",
+      "unnaturalMotion": "부자연스러운 움직임이 감지되었습니다. 실제 얼굴로 다시 시도해주세요.",
+      "tooManyRetries": "너무 많은 시도입니다. 10분 후에 다시 시도해주세요."
+    },
+    "guide": {
+      "title": "인증 절차",
+      "step1Title": "카메라 시작",
+      "step1Desc": "카메라 앞에 얼굴을 위치시키세요",
+      "step2Title": "첫 번째 방향",
+      "step2Desc": "빨간 점(A) 방향으로 고개를 돌리세요",
+      "step3Title": "두 번째 방향",
+      "step3Desc": "다른 방향의 점으로 고개를 돌리세요",
+      "step4Title": "인증 완료",
+      "step4Desc": "2회 통과 시 출석이 자동 기록됩니다"
+    },
+    "recognized": {
+      "title": "인식된 사용자",
+      "confidence": "신뢰도"
+    },
+    "result": {
+      "passedTitle": "본인 인증 성공!",
+      "attendanceRecorded": "출석이 기록되었습니다",
+      "failedTitle": "인증 실패",
+      "expiredTitle": "시간 초과",
+      "tryAgain": "다시 시도해주세요",
+      "done": "완료",
+      "retry": "다시 시도"
+    },
+    "info": {
+      "title": "안내사항",
+      "tip1": "• 얼굴이 타원 안에 위치하도록 해주세요",
+      "tip2": "• 빨간 점 방향으로 천천히 고개를 돌려주세요",
+      "tip3": "• 60초 내에 2번의 인증을 완료해야 합니다"
     }
   },
   "common": {
