@@ -521,10 +521,10 @@ app = FastAPI()
 # CORS settings (allow frontend access)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (during development)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["https://127.0.0.1:5173"],  # Exact UI origin
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # GET endpoint
@@ -544,8 +544,13 @@ async def register_face(name: str, image: bytes):
 # Run server
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
 ```
+
+This teaching fragment omits authentication wiring for brevity. In FaceReco,
+every route that reads or changes biometric/attendance data must enforce the
+appropriate operator or device bearer role; CORS is not authentication. Never
+publish the edge API to the internet.
 
 **Our Project's API Design (Milestone 4)**
 ```
@@ -778,7 +783,7 @@ A:
    ↓
 5. Server: Extract face embedding
    ↓
-6. Server: Save to DB (name + embedding + image)
+6. Server: Save to private storage (name + embedding + a face-cropped thumbnail only if needed)
    ↓
 7. Server: Success response
    ↓
@@ -820,23 +825,25 @@ Optimization Directions:
 **Option 1: SQLite (Simple Project)**
 ```sql
 CREATE TABLE faces (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,  -- opaque ID that does not reveal a storage path
     name TEXT NOT NULL,
     embedding BLOB,  -- 512-dimensional vector (serialized)
-    image_path TEXT,
+    has_thumbnail BOOLEAN NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+Embeddings and thumbnails are both biometric data. Never place them under a public static path; use encrypted storage and least-privilege modes (directories `0700`, files `0600`).
 
 **Option 2: JSON File (Simpler)**
 ```json
 {
   "faces": [
     {
-      "id": 1,
-      "name": "John Doe",
+      "id": "7ce78075-8f1d-4f6a-a7de-5dd8f59075f2",
+      "name": "Synthetic Demo User",
       "embedding": [0.1, 0.2, ..., 0.5],  // 512 numbers
-      "image_path": "faces/1.jpg",
+      "has_thumbnail": true,
       "created_at": "2026-02-06T12:00:00"
     }
   ]
@@ -874,13 +881,13 @@ def find_matching_face(query_embedding, database_embeddings, threshold=0.6):
 Q: Should face images be stored in DB?
 A:
    - Store only embeddings: Fast, less storage, can't view image
-   - Store images too: Slow, more storage, can view image
-   → Recommend storing both (embedding + image path)
+   - Store a thumbnail too: Only when operators must visually verify a record; crop and bound it to the face region
+   → Never retain the original frame. If a thumbnail is necessary, keep it with the embedding in encrypted private storage and expose it only through an authenticated API.
 
 Q: How to store embedding vectors?
 A:
    - Serialize NumPy array to bytes
-   - pickle, JSON, or dedicated vector DB
+   - NPY with `allow_pickle=False`, a validated BLOB format, or a dedicated vector DB
 
 Q: What about recognition speed with 1000 registered faces?
 A:
@@ -907,15 +914,15 @@ try:
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         raise Exception("Cannot open camera")
-except Exception as e:
-    logger.error(f"Camera error: {e}")
+except Exception:
+    logger.error("camera_unavailable")
     # Notify user
 
 # 2. Model load error
 try:
     model = load_model("model_name")
-except Exception as e:
-    logger.error(f"Model load failed: {e}")
+except Exception:
+    logger.error("model_load_failed")
     # Use alternative model or exit
 
 # 3. API error
@@ -924,11 +931,11 @@ async def register_face(name: str, image: UploadFile):
     try:
         # Face registration logic
         ...
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Face registration failed: {e}")
-        raise HTTPException(status_code=500, detail="Server error")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid registration request") from None
+    except Exception:
+        logger.error("face_registration_failed")
+        raise HTTPException(status_code=500, detail="Server error") from None
 ```
 
 **Logging Configuration**

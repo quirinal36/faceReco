@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { faceAPI, getApiBaseUrl } from '../services/api';
+import ProtectedThumbnail from '../components/ProtectedThumbnail';
+import { faceAPI } from '../services/api';
 
 function FaceList() {
   const { t } = useTranslation();
@@ -11,24 +12,23 @@ function FaceList() {
   const [addSampleLoading, setAddSampleLoading] = useState(null);
   const [mergeLoading, setMergeLoading] = useState(null);
 
-  useEffect(() => {
-    fetchFaces();
-  }, []);
-
-  const fetchFaces = async () => {
+  const fetchFaces = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const response = await faceAPI.getFaces();
       setFaces(response.data.faces || []);
-    } catch (error) {
-      console.error('Failed to fetch faces:', error);
+    } catch {
       setError(t('faceList.loading'));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    fetchFaces();
+  }, [fetchFaces]);
 
   const handleDelete = async (id, name) => {
     if (!window.confirm(t('faceList.confirmDelete', { name }))) {
@@ -40,15 +40,14 @@ function FaceList() {
     try {
       await faceAPI.deleteFace(id);
       setFaces(faces.filter((face) => face.face_id !== id));
-    } catch (error) {
-      console.error('Failed to delete face:', error);
+    } catch {
       alert(t('faceList.messages.deleteFailed'));
     } finally {
       setDeleteLoading(null);
     }
   };
 
-  const handleAddSample = async (faceId, name) => {
+  const handleAddSample = async (faceId) => {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
@@ -72,8 +71,7 @@ function FaceList() {
         } else {
           alert(response.data.message);
         }
-      } catch (error) {
-        console.error('Failed to add sample:', error);
+      } catch {
         alert(t('faceList.messages.addSampleFailed'));
       } finally {
         setAddSampleLoading(null);
@@ -100,8 +98,7 @@ function FaceList() {
       } else {
         alert(response.data.message);
       }
-    } catch (error) {
-      console.error('Failed to merge faces:', error);
+    } catch {
       alert(t('faceList.messages.mergeFailed'));
     } finally {
       setMergeLoading(null);
@@ -243,11 +240,28 @@ function FaceList() {
               className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
             >
               <div className="aspect-square bg-gray-100 relative">
-                {face.image_path ? (
-                  <img
-                    src={`${getApiBaseUrl()}${face.image_path}`}
+                {face.thumbnail_url ? (
+                  <ProtectedThumbnail
+                    faceId={face.face_id}
                     alt={face.name}
                     className="w-full h-full object-cover"
+                    fallback={(
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg
+                          className="w-24 h-24 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                          />
+                        </svg>
+                      </div>
+                    )}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
@@ -362,7 +376,7 @@ function FaceList() {
                     </button>
                   )}
                   <button
-                    onClick={() => handleAddSample(face.face_id, face.name)}
+                    onClick={() => handleAddSample(face.face_id)}
                     disabled={addSampleLoading === face.face_id}
                     className={`w-full py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
                       addSampleLoading === face.face_id

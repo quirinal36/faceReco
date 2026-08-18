@@ -19,7 +19,9 @@ Web dashboard frontend for the Face Recognition System.
 ### Prerequisites
 
 - Node.js 18+ and npm
-- Backend server running on `http://localhost:8000`
+- Backend server running on loopback at `http://127.0.0.1:8000` with operator
+  and device credentials provisioned as described in
+  [Security & Privacy Operations](../docs/SECURITY.md)
 
 ### 1. Install Dependencies
 
@@ -27,13 +29,17 @@ Web dashboard frontend for the Face Recognition System.
 npm install
 ```
 
-### 2. Environment Variables
+### 2. API and authentication configuration
 
-Create a `.env` file in the frontend directory and configure the backend API URL:
+Local development uses Vite's same-origin `/api` proxy; no frontend environment
+file is required. If a separately hosted UI needs `VITE_API_URL`, it may contain
+only the public API origin. Never put an operator/device token in a `VITE_*`
+variable because Vite exposes those values to the browser bundle.
 
-```env
-VITE_API_URL=http://localhost:8000
-```
+At runtime the UI asks for one bearer credential, validates its role with
+`/api/auth/whoami`, and keeps it in the current tab's session storage. It is
+cleared when the tab closes or the API returns `401`. Never put the token in a
+URL or query parameter.
 
 ### 3. Run Development Server
 
@@ -41,7 +47,9 @@ VITE_API_URL=http://localhost:8000
 npm run dev
 ```
 
-Open your browser and navigate to [http://localhost:5173](http://localhost:5173).
+Open [https://127.0.0.1:5173](https://127.0.0.1:5173) and accept the local
+development certificate if necessary. Vite and the backend both bind to
+loopback; do not publish either service to the internet.
 
 ## Features
 
@@ -53,12 +61,12 @@ Open your browser and navigate to [http://localhost:5173](http://localhost:5173)
   - Recognized faces count
   - FPS (Frames Per Second)
 
-### Face Registration (`/face-registration`)
+### Face Registration (`/register`)
 - **Camera Capture** - Take photos using webcam
 - **Face Upload** - Register new faces with names
 - **Duplicate Detection** - Prevents duplicate registrations
 
-### Face List (`/face-list`)
+### Face List (`/faces`)
 - **View All Faces** - Browse all registered faces
 - **Face Management** - Delete faces from database
 - **Merge Duplicates** - Combine duplicate entries
@@ -103,9 +111,12 @@ npm run test:report
 ### Screenshots
 
 ```bash
-# Capture screenshots of all pages
-npm run capture-screenshots
+# Capture deterministic synthetic screenshots only
+FACERECO_SYNTHETIC_DOCS=1 npm run capture-screenshots
 ```
+
+The capture script refuses to run without the synthetic-data flag and intercepts
+all API calls. Never capture documentation from a live face or attendance store.
 
 ## Project Structure
 
@@ -149,9 +160,9 @@ The frontend communicates with the backend API through Axios. Base URL is config
 - `POST /api/face/register` - Register new face
 - `GET /api/faces/list` - List all registered faces
 - `DELETE /api/face/{id}` - Delete face by ID
-- `POST /api/faces/merge/{name}` - Merge duplicate faces
+- `POST /api/faces/merge` - Merge duplicate faces (name in the JSON body)
 
-See [API Guide](../API_GUIDE.md) for detailed API documentation.
+See [API Guide](../API_GUIDE_EN.md) for detailed API documentation.
 
 ## Internationalization (i18n)
 
@@ -181,15 +192,16 @@ The optimized files will be generated in the `dist/` directory.
 
 ### Deployment
 
-The built files can be served by any static file server:
+Preview the built files only on loopback:
 
 ```bash
 # Preview production build locally
 npm run preview
-
-# Or use a static server
-npx serve dist
 ```
+
+For deployment, use the approved same-origin loopback/TLS service and host
+firewall from the security guide. Do not launch an arbitrary public static
+server or expose the Vite API proxy.
 
 ## Testing
 
@@ -236,7 +248,7 @@ If the camera doesn't work:
 
 If API calls fail:
 - Verify backend CORS configuration
-- Check `VITE_API_URL` in `.env`
+- If used, verify that `VITE_API_URL` contains only the API origin and no token
 - Ensure backend server is running
 
 ### Build Errors

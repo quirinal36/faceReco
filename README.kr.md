@@ -21,7 +21,8 @@
 - [PRD (제품 요구사항)](./PRD.md)
 - [프로젝트 계획서](./PROJECT_PLAN.md)
 - [학습 워크북 (Learning Workbook)](./LEARNING_WORKBOOK.md) - 프로젝트 관리자를 위한 기술 학습 가이드
-- [API 가이드](./API_GUIDE.md) - FastAPI 서버 사용 방법
+- [API 가이드](./docs/API_GUIDE.md) - 인증이 적용된 FastAPI 서버 사용 방법
+- [보안 및 개인정보 운영 가이드](./docs/SECURITY.md) - 배포·저장소·인증정보·사고 대응 필수 기준
 - [트러블슈팅 가이드](./TROUBLESHOOTING.md) - 설치 및 실행 문제 해결
 
 ## 프로젝트 구조
@@ -142,11 +143,14 @@ faceReco/
 
 ### 1. 초기 설정
 1. 리포지토리를 클론하고 의존성 패키지를 설치합니다 ([설치 방법](#설치-방법) 참고)
-2. 백엔드와 프론트엔드 서버를 동시에 시작합니다:
+2. [필수 로컬 보안 설정](#필수-로컬-보안-설정)에 따라 operator와 device
+   Bearer 인증정보를 준비합니다.
+3. 백엔드와 프론트엔드 서버를 동시에 시작합니다:
    ```bash
    npm run dev
    ```
-3. 웹 브라우저에서 http://localhost:5173 으로 접속합니다
+4. 웹 브라우저에서 https://127.0.0.1:5173 으로 접속하고 요청되는 역할의
+   인증정보를 입력합니다. 인증정보는 현재 browser tab session에만 유지됩니다.
 
 ### 2. 얼굴 등록하기
 1. 사이드바에서 **얼굴 등록** 페이지로 이동합니다
@@ -188,9 +192,11 @@ npm test
 
 ### 6. API 연동
 백엔드 API와 연동하는 개발자를 위해:
-- **API 문서**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- 자세한 엔드포인트 문서는 [API 가이드](./API_GUIDE.md)를 참고하세요
+- **개발 API 문서**: http://127.0.0.1:8000/docs
+- **개발 ReDoc**: http://127.0.0.1:8000/redoc
+- Bearer 인증정보는 `Authorization` header로만 전송하고 URL query에 넣지
+  않습니다.
+- 자세한 엔드포인트 문서는 [API 가이드](./docs/API_GUIDE.md)를 참고하세요.
 
 ## 시작하기
 
@@ -248,7 +254,35 @@ npm test
    python test_installation.py
    ```
 
-   **참고**: 첫 실행 시 InsightFace buffalo_l 모델이 자동으로 다운로드됩니다 (~600MB)
+   **모델 준비**: 통제된 staging/build 호스트에서 InsightFace artifact를
+   다운로드하고 버전과 checksum을 검증한 뒤, 고정된 bundle을 edge의
+   `$FACERECO_MODEL_ROOT/models/buffalo_l/*.onnx`에 배치하세요(다른 승인 모델은
+   `FACERECO_MODEL_NAME`과 일치하는 디렉터리 사용). 운영 edge는 실행 중 모델을
+   다운로드하면 안 됩니다. 자세한 내용은
+   [보안 가이드](./docs/SECURITY.md#model-artifacts-and-egress)를 참고하세요.
+
+### 필수 로컬 보안 설정
+
+서로 다른 32자 이상의 무작위 Bearer 인증정보 두 개가 없으면 서버가
+fail-closed 방식으로 시작을 거부합니다. 임시 로컬 개발 shell에서는 다음처럼
+생성할 수 있습니다.
+
+```bash
+export FACERECO_OPERATOR_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export FACERECO_DEVICE_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export FACERECO_CORS_ORIGINS="https://127.0.0.1:5173"
+```
+
+관리되는 서비스는 보호된 `FACERECO_OPERATOR_TOKEN_FILE`과
+`FACERECO_DEVICE_TOKEN_FILE`을 사용하세요. `operator`는 얼굴 등록·목록·삭제,
+카메라와 출석 관리를 수행하고, 단일 로컬 `device` 인증정보는 liveness 작업만
+수행합니다. 브라우저는 인증정보 하나를 입력받아 `/api/auth/whoami`로 역할을
+확인한 뒤 현재 tab의 session storage에만 보관합니다.
+
+Bearer token을 URL이나 Vite `VITE_*` 변수에 넣지 마세요. 저장소의
+[`.env.example`](./.env.example)은 의도적으로 유효하지 않은 placeholder이며
+자동으로 로드되지 않습니다. 영구 인증정보를 준비하거나 LAN/VPN 접근 또는
+운영 모드를 사용하기 전에 [보안 가이드](./docs/SECURITY.md)를 읽으세요.
 
 ### 실행 방법
 
@@ -273,9 +307,14 @@ start-dev.bat
 ```
 
 서버 시작 후:
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API 문서**: http://localhost:8000/docs
+- **Frontend**: https://127.0.0.1:5173
+- **Backend API**: http://127.0.0.1:8000
+- **API 문서(개발 모드 전용)**: http://127.0.0.1:8000/docs
+
+API는 기본적으로 loopback에만 bind합니다. 인터넷에 공개하거나
+`0.0.0.0`을 사용하지 마세요. 신뢰할 수 있는 개발 LAN/VPN의 특정 주소는
+보안 가이드의 명시적 opt-in이 필요하고, 운영 환경은 항상 loopback inbound와
+Edu Manager로의 outbound HTTPS만 사용합니다.
 
 ---
 
@@ -325,17 +364,20 @@ python server.py
 ```
 
 서버 시작 후:
-- **API 문서**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/api/health
+- **API 문서(개발 모드 전용)**: http://127.0.0.1:8000/docs
+- **ReDoc(개발 모드 전용)**: http://127.0.0.1:8000/redoc
+- **Health Check**: http://127.0.0.1:8000/api/health
 
 **API 엔드포인트**:
 - `POST /api/face/register` - 얼굴 등록
 - `GET /api/faces/list` - 등록된 얼굴 목록
+- `GET /api/faces/{id}/thumbnail` - operator 인증 썸네일 조회
 - `DELETE /api/face/{id}` - 얼굴 삭제
 - `GET /api/camera/stream` - 실시간 비디오 스트리밍
 
-자세한 사용 방법은 [API 가이드](./API_GUIDE.md)를 참고하세요.
+최소 health check 이외의 API에는 역할에 맞는
+`Authorization: Bearer ...` header가 필요합니다. 자세한 사용 방법은
+[API 가이드](./docs/API_GUIDE.md)를 참고하세요.
 
 #### 6. 개별 모듈 실행
 ```bash

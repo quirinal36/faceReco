@@ -6,11 +6,26 @@
 
 import os
 import json
+import copy
+import logging
+import re
+import tempfile
 import numpy as np
 import cv2
+from pathlib import Path
 from typing import Optional, List, Tuple, Dict
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
+
+try:
+    from utils.private_storage import ensure_private_directory, ensure_private_file
+except ModuleNotFoundError:  # Imported as backend.models.face_database in tests.
+    from backend.utils.private_storage import ensure_private_directory, ensure_private_file
+
+
+logger = logging.getLogger(__name__)
+SAFE_FACE_ID = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+THUMBNAIL_MAX_SIZE = 256
 
 
 class FaceDatabase:
@@ -47,6 +62,7 @@ class FaceDatabase:
 
         self.threshold = threshold
         self.faces = {}
+        self._load_failed = False
         self.config = {
             'threshold': threshold,
             'model_name': 'default',
@@ -61,9 +77,121 @@ class FaceDatabase:
 
     def _create_directories(self) -> None:
         """필요한 디렉토리 생성"""
-        os.makedirs(self.data_dir, exist_ok=True)
-        os.makedirs(self.embeddings_dir, exist_ok=True)
-        os.makedirs(self.faces_dir, exist_ok=True)
+        ensure_private_directory(self.data_dir)
+        ensure_private_directory(self.embeddings_dir)
+        ensure_private_directory(self.faces_dir)
+
+        for directory, suffixes in (
+            (Path(self.embeddings_dir), {".npy"}),
+            (Path(self.faces_dir), {".jpg", ".jpeg"}),
+        ):
+            for path in directory.iterdir():
+                if path.is_symlink():
+                    raise RuntimeError(
+                        "Private biometric storage cannot contain symbolic links"
+                    )
+                if path.is_file() and path.suffix.lower() in suffixes:
+                    ensure_private_file(path)
+
+        database_path = Path(self.db_path)
+        if database_path.is_symlink():
+            raise RuntimeError("Face database cannot be a symbolic link")
+        if database_path.exists():
+            ensure_private_file(database_path)
+
+    @staticmethod
+    def _validate_face_id(face_id: str) -> None:
+        if not SAFE_FACE_ID.fullmatch(face_id):
+            raise ValueError("Invalid face identifier")
+
+    @staticmethod
+    def _bounded_thumbnail(face_image: np.ndarray) -> np.ndarray:
+        """Cap retained images even when non-API callers provide a full frame."""
+        if face_image is None or face_image.size == 0:
+            raise ValueError("Invalid thumbnail")
+        height, width = face_image.shape[:2]
+        scale = min(THUMBNAIL_MAX_SIZE / width, THUMBNAIL_MAX_SIZE / height, 1.0)
+        if scale >= 1.0:
+            return face_image
+        return cv2.resize(
+            face_image,
+            (max(1, round(width * scale)), max(1, round(height * scale))),
+            interpolation=cv2.INTER_AREA,
+        )
+
+    @staticmethod
+    def _exclusive_open_flags() -> int:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        return flags
+
+    def _write_embedding_exclusive(
+        self, path: str | os.PathLike[str], embedding: np.ndarray
+    ) -> None:
+        """Create one embedding without following or replacing an old path."""
+        file_descriptor = os.open(path, self._exclusive_open_flags(), 0o600)
+        try:
+            with os.fdopen(file_descriptor, "wb") as output:
+                np.save(output, np.asarray(embedding), allow_pickle=False)
+                output.flush()
+                os.fsync(output.fileno())
+            ensure_private_file(path)
+        except Exception:
+            try:
+                candidate = Path(path)
+                if candidate.is_file() and not candidate.is_symlink():
+                    candidate.unlink()
+            except OSError:
+                logger.error("partial_embedding_cleanup_failed")
+            raise
+
+    def _write_thumbnail_exclusive(
+        self, path: str | os.PathLike[str], face_image: np.ndarray
+    ) -> None:
+        """Encode and exclusively create one bounded JPEG thumbnail."""
+        encoded, buffer = cv2.imencode(
+            ".jpg",
+            self._bounded_thumbnail(face_image),
+            [int(cv2.IMWRITE_JPEG_QUALITY), 80],
+        )
+        if not encoded:
+            raise RuntimeError("Thumbnail encoding failed")
+
+        file_descriptor = os.open(path, self._exclusive_open_flags(), 0o600)
+        try:
+            with os.fdopen(file_descriptor, "wb") as output:
+                output.write(buffer.tobytes())
+                output.flush()
+                os.fsync(output.fileno())
+            ensure_private_file(path)
+        except Exception:
+            try:
+                candidate = Path(path)
+                if candidate.is_file() and not candidate.is_symlink():
+                    candidate.unlink()
+            except OSError:
+                logger.error("partial_thumbnail_cleanup_failed")
+            raise
+
+    def _resolve_stored_path(
+        self,
+        relative_path: str,
+        root: str,
+        suffixes: set[str],
+    ) -> Optional[Path]:
+        """Resolve an existing store path and reject traversal or symlinks."""
+        if not isinstance(relative_path, str):
+            return None
+        candidate = Path(self.data_dir, relative_path)
+        if candidate.is_symlink() or candidate.suffix.lower() not in suffixes:
+            return None
+        try:
+            resolved = candidate.resolve(strict=True)
+            resolved.relative_to(Path(root).resolve(strict=True))
+        except (FileNotFoundError, OSError, RuntimeError, ValueError):
+            return None
+        return resolved if resolved.is_file() else None
 
     def register_face(
         self,
@@ -84,16 +212,25 @@ class FaceDatabase:
         Returns:
             bool: 등록 성공 여부
         """
+        created_paths: List[str] = []
         try:
+            self._validate_face_id(face_id)
+            if self._load_failed:
+                raise RuntimeError("Face store is unavailable")
+            if face_id in self.faces:
+                raise ValueError("Face identifier already exists")
+
             # 임베딩 저장
             embedding_path = os.path.join(self.embeddings_dir, f"{face_id}.npy")
-            np.save(embedding_path, embedding)
+            self._write_embedding_exclusive(embedding_path, embedding)
+            created_paths.append(embedding_path)
 
-            # 얼굴 이미지 저장 (선택사항)
+            # 얼굴 썸네일 저장 (선택사항). API 계층은 얼굴 bbox로 먼저 자릅니다.
             image_path = None
             if face_image is not None:
                 image_path = os.path.join(self.faces_dir, f"{face_id}.jpg")
-                cv2.imwrite(image_path, face_image)
+                self._write_thumbnail_exclusive(image_path, face_image)
+                created_paths.append(image_path)
 
             # 메타데이터 구성
             if metadata is None:
@@ -117,12 +254,20 @@ class FaceDatabase:
             self.faces[face_id] = face_data
 
             # 자동 저장
-            self.save()
+            if not self.save():
+                raise RuntimeError("Face store write failed")
 
             return True
 
-        except Exception as e:
-            print(f"얼굴 등록 실패: {str(e)}")
+        except Exception:
+            self.faces.pop(face_id, None)
+            for path in created_paths:
+                try:
+                    if os.path.isfile(path) and not os.path.islink(path):
+                        os.remove(path)
+                except OSError:
+                    logger.error("biometric_registration_rollback_failed")
+            logger.error("biometric_registration_failed")
             return False
 
     def add_face_sample(
@@ -143,10 +288,15 @@ class FaceDatabase:
             bool: 추가 성공 여부
         """
         if face_id not in self.faces:
-            print(f"얼굴 ID '{face_id}'를 찾을 수 없습니다.")
             return False
 
+        embedding_path = None
+        thumbnail_path = None
+        original_face_data = copy.deepcopy(self.faces.get(face_id))
         try:
+            self._validate_face_id(face_id)
+            if self._load_failed:
+                raise RuntimeError("Face store is unavailable")
             face_data = self.faces[face_id]
 
             # 샘플 인덱스 계산
@@ -154,7 +304,7 @@ class FaceDatabase:
 
             # 임베딩 저장
             embedding_path = os.path.join(self.embeddings_dir, f"{face_id}_{sample_idx}.npy")
-            np.save(embedding_path, embedding)
+            self._write_embedding_exclusive(embedding_path, embedding)
 
             # 임베딩 경로 추가
             if 'embedding_paths' not in face_data:
@@ -163,30 +313,38 @@ class FaceDatabase:
 
             face_data['embedding_paths'].append(f"embeddings/{face_id}_{sample_idx}.npy")
 
-            # 이미지 저장 (선택사항)
-            if face_image is not None:
-                image_path = os.path.join(self.faces_dir, f"{face_id}_{sample_idx}.jpg")
-                cv2.imwrite(image_path, face_image)
-
-                # 이미지 경로 추가
-                if 'image_paths' not in face_data:
-                    # 기존 데이터 마이그레이션
-                    existing_image = face_data.get('image_path')
-                    face_data['image_paths'] = [existing_image] if existing_image else []
-
-                face_data['image_paths'].append(f"faces/{face_id}_{sample_idx}.jpg")
+            # 샘플별 원본 이미지는 보관하지 않습니다. 기존 프로필에 썸네일이
+            # 없을 때만 전달된 최소 이미지를 한 번 저장합니다.
+            if face_image is not None and not face_data.get('image_path'):
+                image_path = os.path.join(self.faces_dir, f"{face_id}.jpg")
+                self._write_thumbnail_exclusive(image_path, face_image)
+                thumbnail_path = image_path
+                face_data['image_path'] = f"faces/{face_id}.jpg"
+                face_data['image_paths'] = [f"faces/{face_id}.jpg"]
 
             # 샘플 카운트 증가
             face_data['sample_count'] = sample_idx + 1
 
             # 저장
-            self.save()
+            if not self.save():
+                raise RuntimeError("Face store write failed")
 
-            print(f"'{face_data['name']}'에 {sample_idx + 1}번째 샘플 추가 완료")
             return True
 
-        except Exception as e:
-            print(f"샘플 추가 실패: {str(e)}")
+        except Exception:
+            if original_face_data is not None:
+                self.faces[face_id] = original_face_data
+            if embedding_path and os.path.isfile(embedding_path):
+                try:
+                    os.remove(embedding_path)
+                except OSError:
+                    logger.error("biometric_sample_rollback_failed")
+            if thumbnail_path and os.path.isfile(thumbnail_path):
+                try:
+                    os.remove(thumbnail_path)
+                except OSError:
+                    logger.error("thumbnail_rollback_failed")
+            logger.error("biometric_sample_add_failed")
             return False
 
     def find_match(
@@ -223,12 +381,13 @@ class FaceDatabase:
                 if not emb_path:
                     continue
 
-                full_path = os.path.join(self.data_dir, emb_path)
-
-                if not os.path.exists(full_path):
+                full_path = self._resolve_stored_path(
+                    emb_path, self.embeddings_dir, {'.npy'}
+                )
+                if full_path is None:
                     continue
 
-                stored_embedding = np.load(full_path)
+                stored_embedding = np.load(full_path, allow_pickle=False)
 
                 # 유사도 계산
                 emb1 = embedding.reshape(1, -1)
@@ -296,33 +455,45 @@ class FaceDatabase:
 
         try:
             face_data = self.faces[face_id]
+            paths_to_delete: List[Path] = []
 
-            # 모든 임베딩 파일 삭제
             embedding_paths = face_data.get('embedding_paths', [face_data.get('embedding_path')])
             for emb_path in embedding_paths:
                 if emb_path:
-                    full_path = os.path.join(self.data_dir, emb_path)
-                    if os.path.exists(full_path):
-                        os.remove(full_path)
+                    full_path = self._resolve_stored_path(
+                        emb_path, self.embeddings_dir, {'.npy'}
+                    )
+                    if full_path is not None:
+                        paths_to_delete.append(full_path)
 
-            # 모든 이미지 파일 삭제
             image_paths = face_data.get('image_paths', [face_data.get('image_path')])
             for img_path in image_paths:
                 if img_path:
-                    full_path = os.path.join(self.data_dir, img_path)
-                    if os.path.exists(full_path):
-                        os.remove(full_path)
+                    full_path = self._resolve_stored_path(
+                        img_path, self.faces_dir, {'.jpg', '.jpeg'}
+                    )
+                    if full_path is not None:
+                        paths_to_delete.append(full_path)
 
-            # 데이터베이스에서 제거
+            # Remove artifacts while the persisted metadata still identifies
+            # them. If one unlink fails, a later request can safely retry rather
+            # than leaving an unreferenced biometric file behind.
+            for path in set(paths_to_delete):
+                try:
+                    os.remove(path)
+                except OSError:
+                    logger.error("biometric_artifact_deletion_failed")
+                    return False
+
             del self.faces[face_id]
-
-            # 저장
-            self.save()
+            if not self.save():
+                self.faces[face_id] = face_data
+                return False
 
             return True
 
-        except Exception as e:
-            print(f"얼굴 삭제 실패: {str(e)}")
+        except Exception:
+            logger.error("biometric_deletion_failed")
             return False
 
     def update_metadata(self, face_id: str, metadata: Dict) -> bool:
@@ -339,9 +510,12 @@ class FaceDatabase:
         if face_id not in self.faces:
             return False
 
+        original_metadata = copy.deepcopy(self.faces[face_id]['metadata'])
         self.faces[face_id]['metadata'].update(metadata)
-        self.save()
-        return True
+        if self.save():
+            return True
+        self.faces[face_id]['metadata'] = original_metadata
+        return False
 
     def merge_faces_by_name(self, name: str) -> Optional[str]:
         """
@@ -360,20 +534,15 @@ class FaceDatabase:
                 matching_faces.append((face_id, face_data))
 
         if len(matching_faces) <= 1:
-            print(f"'{name}' 이름을 가진 얼굴이 1개 이하입니다. 통합할 필요가 없습니다.")
             return None
 
         # 가장 오래된 얼굴을 메인으로 선택 (registered_at 기준)
         matching_faces.sort(key=lambda x: x[1].get('registered_at', ''))
         main_face_id, main_face_data = matching_faces[0]
 
-        print(f"'{name}' 이름을 가진 {len(matching_faces)}개의 얼굴을 '{main_face_id}'로 통합합니다...")
-
         try:
             # 나머지 얼굴들의 샘플을 메인 얼굴에 추가
             for face_id, face_data in matching_faces[1:]:
-                print(f"  - {face_id}의 샘플들을 {main_face_id}에 추가 중...")
-
                 # 모든 임베딩 가져오기
                 embedding_paths = face_data.get('embedding_paths', [face_data.get('embedding_path')])
                 image_paths = face_data.get('image_paths', [face_data.get('image_path')])
@@ -383,31 +552,33 @@ class FaceDatabase:
                         continue
 
                     # 임베딩 로드
-                    full_emb_path = os.path.join(self.data_dir, emb_path)
-                    if not os.path.exists(full_emb_path):
+                    full_emb_path = self._resolve_stored_path(
+                        emb_path, self.embeddings_dir, {'.npy'}
+                    )
+                    if full_emb_path is None:
                         continue
 
-                    embedding = np.load(full_emb_path)
+                    embedding = np.load(full_emb_path, allow_pickle=False)
 
                     # 이미지 로드 (있으면)
                     face_image = None
                     if i < len(image_paths) and image_paths[i]:
-                        full_img_path = os.path.join(self.data_dir, image_paths[i])
-                        if os.path.exists(full_img_path):
-                            face_image = cv2.imread(full_img_path)
+                        full_img_path = self._resolve_stored_path(
+                            image_paths[i], self.faces_dir, {'.jpg', '.jpeg'}
+                        )
+                        if full_img_path is not None:
+                            face_image = cv2.imread(str(full_img_path))
 
                     # 메인 얼굴에 샘플 추가
                     self.add_face_sample(main_face_id, embedding, face_image)
 
                 # 원본 얼굴 삭제
                 self.remove_face(face_id)
-                print(f"  - {face_id} 삭제 완료")
 
-            print(f"'{name}' 통합 완료! 메인 ID: {main_face_id}, 총 샘플 수: {main_face_data['sample_count']}")
             return main_face_id
 
-        except Exception as e:
-            print(f"얼굴 통합 실패: {str(e)}")
+        except Exception:
+            logger.error("biometric_merge_failed")
             return None
 
     def get_all_faces(self) -> List[Dict]:
@@ -419,6 +590,20 @@ class FaceDatabase:
         """
         return list(self.faces.values())
 
+    def get_thumbnail_path(self, face_id: str) -> Optional[str]:
+        """Resolve one server-owned thumbnail path without exposing layout."""
+        face_data = self.faces.get(face_id)
+        if not face_data:
+            return None
+        relative_path = face_data.get('image_path')
+        if not relative_path:
+            return None
+
+        resolved = self._resolve_stored_path(
+            relative_path, self.faces_dir, {'.jpg', '.jpeg'}
+        )
+        return str(resolved) if resolved is not None else None
+
     def save(self) -> bool:
         """
         데이터베이스 저장
@@ -426,7 +611,12 @@ class FaceDatabase:
         Returns:
             bool: 저장 성공 여부
         """
+        temp_path = None
         try:
+            if self._load_failed:
+                raise RuntimeError("Refusing to overwrite an unreadable face store")
+            if Path(self.db_path).is_symlink():
+                raise RuntimeError("Face database cannot be a symbolic link")
             db_data = {
                 'version': '1.0',
                 'created_at': datetime.now().isoformat(),
@@ -435,13 +625,30 @@ class FaceDatabase:
                 'config': self.config
             }
 
-            with open(self.db_path, 'w', encoding='utf-8') as f:
+            file_descriptor, temp_path = tempfile.mkstemp(
+                prefix=".face-database-",
+                suffix=".tmp",
+                dir=self.data_dir,
+            )
+            if os.name == "posix":
+                os.chmod(temp_path, 0o600)
+            with os.fdopen(file_descriptor, 'w', encoding='utf-8') as f:
                 json.dump(db_data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, self.db_path)
+            temp_path = None
+            ensure_private_file(self.db_path)
 
             return True
 
-        except Exception as e:
-            print(f"데이터베이스 저장 실패: {str(e)}")
+        except Exception:
+            if temp_path and os.path.isfile(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    logger.error("face_store_temp_cleanup_failed")
+            logger.error("face_store_save_failed")
             return False
 
     def load(self) -> bool:
@@ -452,12 +659,14 @@ class FaceDatabase:
             bool: 로드 성공 여부
         """
         if not os.path.exists(self.db_path):
-            print(f"데이터베이스 파일이 없습니다. 새로 생성합니다: {self.db_path}")
             return False
 
         try:
+            if Path(self.db_path).is_symlink() or not Path(self.db_path).is_file():
+                raise RuntimeError("Face database must be a regular file")
             with open(self.db_path, 'r', encoding='utf-8') as f:
                 db_data = json.load(f)
+            ensure_private_file(self.db_path)
 
             self.faces = db_data.get('faces', {})
             self.config = db_data.get('config', self.config)
@@ -466,11 +675,11 @@ class FaceDatabase:
             if 'threshold' in self.config:
                 self.threshold = self.config['threshold']
 
-            print(f"데이터베이스 로드 완료: {len(self.faces)}명의 얼굴 데이터")
             return True
 
-        except Exception as e:
-            print(f"데이터베이스 로드 실패: {str(e)}")
+        except Exception:
+            self._load_failed = True
+            logger.error("face_store_load_failed")
             return False
 
     def get_statistics(self) -> Dict:
@@ -489,8 +698,12 @@ class FaceDatabase:
             'total_recognitions': total_recognitions,
             'threshold': self.threshold,
             'model_name': self.config.get('model_name', 'default'),
-            'db_path': self.db_path
         }
+
+    @property
+    def is_available(self) -> bool:
+        """Whether the persisted metadata store was loaded without corruption."""
+        return not self._load_failed
 
     def __enter__(self):
         """Context manager 진입"""

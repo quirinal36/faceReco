@@ -27,7 +27,8 @@ export default defineConfig({
   // 모든 테스트에 공통으로 적용되는 옵션
   use: {
     // 기본 URL
-    baseURL: 'http://localhost:5173',
+    baseURL: 'https://127.0.0.1:5173',
+    ignoreHTTPSErrors: true,
 
     // 스크린샷 옵션
     screenshot: 'only-on-failure',
@@ -70,7 +71,8 @@ export default defineConfig({
   // 개발 서버 설정
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'https://127.0.0.1:5173',
+    ignoreHTTPSErrors: true,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

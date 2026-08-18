@@ -19,7 +19,9 @@
 ### 사전 요구사항
 
 - Node.js 18+ 및 npm
-- `http://localhost:8000`에서 실행 중인 백엔드 서버
+- [보안 및 개인정보 운영 가이드](../docs/SECURITY.md)에 따라 operator와
+  device 인증정보가 준비되고 `http://127.0.0.1:8000` loopback에서 실행 중인
+  backend 서버
 
 ### 1. 의존성 설치
 
@@ -27,13 +29,16 @@
 npm install
 ```
 
-### 2. 환경 변수 설정
+### 2. API 및 인증 설정
 
-frontend 디렉토리에 `.env` 파일을 생성하고 백엔드 API URL을 설정하세요:
+로컬 개발은 Vite의 same-origin `/api` proxy를 사용하므로 frontend 환경 파일이
+필요하지 않습니다. UI를 별도로 호스팅하여 `VITE_API_URL`이 필요한 경우에도
+공개 API origin만 설정할 수 있습니다. Vite는 `VITE_*` 값을 browser bundle에
+노출하므로 operator/device token은 절대 넣지 마세요.
 
-```env
-VITE_API_URL=http://localhost:8000
-```
+UI는 실행 시 Bearer 인증정보 하나를 입력받아 `/api/auth/whoami`로 역할을
+확인한 뒤 현재 tab의 session storage에 보관합니다. Tab을 닫거나 API가 `401`을
+반환하면 지워집니다. Token을 URL이나 query parameter에 넣지 마세요.
 
 ### 3. 개발 서버 실행
 
@@ -41,7 +46,9 @@ VITE_API_URL=http://localhost:8000
 npm run dev
 ```
 
-브라우저에서 [http://localhost:5173](http://localhost:5173)을 열어 확인하세요.
+브라우저에서 [https://127.0.0.1:5173](https://127.0.0.1:5173)을 열고 필요하면
+로컬 개발 인증서를 승인하세요. Vite와 backend는 모두 loopback에 bind하며
+인터넷에 공개하면 안 됩니다.
 
 ## 주요 기능
 
@@ -53,12 +60,12 @@ npm run dev
   - 인식된 얼굴 수
   - FPS (초당 프레임 수)
 
-### 얼굴 등록 (`/face-registration`)
+### 얼굴 등록 (`/register`)
 - **카메라 촬영** - 웹캠을 사용하여 사진 촬영
 - **얼굴 업로드** - 이름과 함께 새로운 얼굴 등록
 - **중복 감지** - 중복 등록 방지
 
-### 얼굴 목록 (`/face-list`)
+### 얼굴 목록 (`/faces`)
 - **모든 얼굴 보기** - 등록된 모든 얼굴 탐색
 - **얼굴 관리** - 데이터베이스에서 얼굴 삭제
 - **중복 병합** - 중복 항목 통합
@@ -103,9 +110,12 @@ npm run test:report
 ### 스크린샷
 
 ```bash
-# 모든 페이지의 스크린샷 캡처
-npm run capture-screenshots
+# 결정론적 synthetic screenshot만 캡처
+FACERECO_SYNTHETIC_DOCS=1 npm run capture-screenshots
 ```
+
+Capture script는 synthetic data flag가 없으면 실행을 거부하고 모든 API 호출을
+가로챕니다. 실제 얼굴 또는 출석 저장소에서 문서 screenshot을 만들지 마세요.
 
 ## 프로젝트 구조
 
@@ -149,9 +159,9 @@ frontend/
 - `POST /api/face/register` - 새로운 얼굴 등록
 - `GET /api/faces/list` - 등록된 모든 얼굴 목록
 - `DELETE /api/face/{id}` - ID로 얼굴 삭제
-- `POST /api/faces/merge/{name}` - 중복 얼굴 병합
+- `POST /api/faces/merge` - 중복 얼굴 병합(이름은 JSON body로 전송)
 
-자세한 API 문서는 [API 가이드](../API_GUIDE.md)를 참고하세요.
+자세한 API 문서는 [API 가이드](../docs/API_GUIDE.md)를 참고하세요.
 
 ## 다국어 지원 (i18n)
 
@@ -181,15 +191,16 @@ npm run build
 
 ### 배포
 
-빌드된 파일은 모든 정적 파일 서버로 제공할 수 있습니다:
+빌드 결과는 loopback에서만 미리 봅니다:
 
 ```bash
 # 로컬에서 프로덕션 빌드 미리보기
 npm run preview
-
-# 또는 정적 서버 사용
-npx serve dist
 ```
+
+배포 시 보안 가이드의 승인된 same-origin loopback/TLS 서비스와 host firewall을
+사용하세요. 임의의 공개 static server를 시작하거나 Vite API proxy를 외부에
+노출하지 마세요.
 
 ## 테스트
 
@@ -236,7 +247,7 @@ npx playwright test tests/face-registration.spec.js
 
 API 호출이 실패하는 경우:
 - 백엔드 CORS 설정 확인
-- `.env`의 `VITE_API_URL` 확인
+- 사용하는 경우 `VITE_API_URL`에는 API origin만 있고 token은 없는지 확인
 - 백엔드 서버가 실행 중인지 확인
 
 ### 빌드 오류

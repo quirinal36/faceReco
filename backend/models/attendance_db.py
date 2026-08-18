@@ -7,8 +7,14 @@ SQLite를 사용한 출석 기록 저장 및 관리
 
 import os
 import sqlite3
+from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime, date
+
+try:
+    from utils.private_storage import ensure_private_directory, ensure_private_file
+except ModuleNotFoundError:  # Imported as backend.models.attendance_db in tests.
+    from backend.utils.private_storage import ensure_private_directory, ensure_private_file
 
 
 class AttendanceDB:
@@ -30,15 +36,32 @@ class AttendanceDB:
         self.db_path = os.path.join(backend_dir, db_path)
 
         # 디렉토리 생성
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        ensure_private_directory(os.path.dirname(self.db_path))
+        self._audit_storage_paths()
 
         # 테이블 생성
         self._create_tables()
 
+    def _audit_storage_paths(self) -> None:
+        """Reject links and repair SQLite database/journal permissions."""
+        database_path = Path(self.db_path)
+        candidates = [database_path]
+        candidates.extend(database_path.parent.glob(f"{database_path.name}-*"))
+        for candidate in candidates:
+            if candidate.is_symlink():
+                raise RuntimeError("Attendance storage cannot contain symbolic links")
+            if candidate.exists():
+                ensure_private_file(candidate)
+
     def _get_connection(self) -> sqlite3.Connection:
         """SQLite 연결 생성 (thread-safe)"""
+        self._audit_storage_paths()
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        ensure_private_file(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA secure_delete = ON")
+        conn.execute("PRAGMA trusted_schema = OFF")
         return conn
 
     def _create_tables(self) -> None:
@@ -61,7 +84,7 @@ class AttendanceDB:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_attendance_name ON attendance(name)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_attendance_face_date ON attendance(face_id, date)")
             conn.commit()
-            print(f"출석 데이터베이스 초기화 완료: {self.db_path}")
+            ensure_private_file(self.db_path)
         finally:
             conn.close()
 

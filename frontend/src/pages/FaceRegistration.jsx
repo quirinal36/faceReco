@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { faceAPI } from '../services/api';
+import { eduAPI, faceAPI } from '../services/api';
 
 function FaceRegistration() {
   const { t } = useTranslation();
@@ -11,6 +11,11 @@ function FaceRegistration() {
   const [cameraActive, setCameraActive] = useState(false);
   const [captured, setCaptured] = useState(null);
   const [name, setName] = useState('');
+  const [students, setStudents] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
+  const [studentId, setStudentId] = useState('');
+  const [enrollmentId, setEnrollmentId] = useState('');
+  const [assignmentLoading, setAssignmentLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [step, setStep] = useState('camera'); // 'camera', 'captured', 'registered'
@@ -46,8 +51,7 @@ function FaceRegistration() {
           text: '비디오 엘리먼트를 초기화할 수 없습니다.'
         });
       }
-    } catch (error) {
-      console.error('카메라 접근 오류:', error);
+    } catch {
       setCameraActive(false);
       setMessage({
         type: 'error',
@@ -57,7 +61,7 @@ function FaceRegistration() {
   };
 
   // 카메라 중지
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -66,10 +70,10 @@ function FaceRegistration() {
       videoRef.current.srcObject = null;
     }
     setCameraActive(false);
-  };
+  }, []);
 
   // 이미지 캡처
-  const captureImage = () => {
+  const captureImage = useCallback(() => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
@@ -87,7 +91,7 @@ function FaceRegistration() {
     setCaptured(imageDataUrl);
     setStep('captured');
     stopCamera();
-  };
+  }, [stopCamera]);
 
   // 다시 촬영
   const retake = () => {
@@ -99,8 +103,6 @@ function FaceRegistration() {
 
   // 등록
   const handleRegister = async () => {
-    console.log('=== 얼굴 등록 시작 ===');
-
     if (!name.trim()) {
       setMessage({ type: 'error', text: t('registration.messages.enterName') });
       return;
@@ -115,25 +117,19 @@ function FaceRegistration() {
     setMessage({ type: '', text: '' });
 
     try {
-      console.log('캡처된 이미지 변환 중...');
-
       // Data URL을 Blob으로 변환
       const blob = await (await fetch(captured)).blob();
       const file = new File([blob], 'captured.jpg', { type: 'image/jpeg' });
 
-      console.log('FormData 생성 중...', { name, fileSize: file.size });
-
       const formData = new FormData();
       formData.append('name', name);
+      formData.append('student_id', studentId);
+      formData.append('enrollment_id', enrollmentId);
       formData.append('file', file);
 
-      console.log('API 호출 중...');
       const response = await faceAPI.registerFace(formData);
 
-      console.log('API 응답:', response.data);
-
       if (response.data.success) {
-        console.log('등록 성공!');
         setMessage({
           type: 'success',
           text: response.data.message || `${name}님의 얼굴이 성공적으로 등록되었습니다!`
@@ -148,17 +144,12 @@ function FaceRegistration() {
           setStep('camera');
         }, 3000);
       } else {
-        console.warn('등록 실패:', response.data.message);
         setMessage({
           type: 'error',
           text: response.data.message || '얼굴 등록에 실패했습니다.'
         });
       }
     } catch (error) {
-      console.error('=== 등록 오류 발생 ===');
-      console.error('오류 상세:', error);
-      console.error('오류 응답:', error.response);
-
       let errorMessage = '얼굴 등록에 실패했습니다. 다시 시도해주세요.';
 
       if (error.response) {
@@ -174,16 +165,12 @@ function FaceRegistration() {
         } else if (message) {
           errorMessage = message;
         }
-
-        console.error('서버 오류 응답:', error.response.status, error.response.data);
       } else if (error.request) {
         // 요청이 전송되었지만 응답을 받지 못함
         errorMessage = '서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.';
-        console.error('서버 응답 없음:', error.request);
       } else {
         // 요청 설정 중 오류 발생
         errorMessage = `요청 오류: ${error.message}`;
-        console.error('요청 설정 오류:', error.message);
       }
 
       setMessage({
@@ -191,10 +178,12 @@ function FaceRegistration() {
         text: errorMessage
       });
     } finally {
-      console.log('로딩 상태 해제');
       setLoading(false);
     }
   };
+
+  useEffect(() => { const month = new Date().toISOString().slice(0, 7); Promise.all([eduAPI.getStudents(), eduAPI.getEnrollments(month)]).then(([a, b]) => { setStudents(a.data.students || []); setEnrollments(b.data.enrollments || []); }).catch(() => setMessage({ type: 'error', text: '학생 및 수강 정보를 불러올 수 없습니다.' })).finally(() => setAssignmentLoading(false)); }, []);
+  const selectStudent = (id) => { const student = students.find((item) => item.id === id); setStudentId(id); setName(student?.name || ''); setEnrollmentId(''); };
 
   // 키보드 이벤트 (스페이스바로 캡처)
   useEffect(() => {
@@ -207,16 +196,15 @@ function FaceRegistration() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [cameraActive, step]);
+  }, [cameraActive, captureImage, step]);
 
   // 컴포넌트 마운트 시 백엔드 카메라 해제
   useEffect(() => {
     const releaseBackendCamera = async () => {
       try {
         await faceAPI.releaseCamera();
-        console.log('백엔드 카메라가 해제되었습니다.');
-      } catch (error) {
-        console.warn('백엔드 카메라 해제 실패:', error.message);
+      } catch {
+        // The local browser camera can still be used if release is unavailable.
       }
     };
 
@@ -227,11 +215,9 @@ function FaceRegistration() {
       stopCamera();
 
       // 백엔드 카메라 재시작
-      faceAPI.reopenCamera().catch((error) => {
-        console.warn('백엔드 카메라 재시작 실패:', error.message);
-      });
+      faceAPI.reopenCamera().catch(() => {});
     };
-  }, []);
+  }, [stopCamera]);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -398,20 +384,8 @@ function FaceRegistration() {
             ) : (
               <>
                 <div className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('registration.name')}
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder={t('registration.namePlaceholder')}
-                      disabled={loading || !captured}
-                    />
-                  </div>
+                  <div><label htmlFor="student" className="block text-sm font-medium text-gray-700 mb-2">학생</label><select id="student" value={studentId} onChange={(e) => selectStudent(e.target.value)} disabled={loading || assignmentLoading} className="w-full px-4 py-2 border border-gray-300 rounded-lg"><option value="">학생을 선택하세요</option>{students.map((student) => <option key={student.id} value={student.id}>{student.name}{student.school ? ' (' + student.school + ')' : ''}</option>)}</select></div>
+                  <div><label htmlFor="enrollment" className="block text-sm font-medium text-gray-700 mb-2">이번 달 수강반</label><select id="enrollment" value={enrollmentId} onChange={(e) => setEnrollmentId(e.target.value)} disabled={loading || assignmentLoading || !studentId} className="w-full px-4 py-2 border border-gray-300 rounded-lg"><option value="">수강반을 선택하세요</option>{enrollments.filter((item) => item.name === name).map((item) => <option key={item.id} value={item.id}>{item.subject} · {item.teacher}</option>)}</select></div>
 
                   {message.text && (
                     <div
@@ -438,9 +412,9 @@ function FaceRegistration() {
 
                   <button
                     onClick={handleRegister}
-                    disabled={loading || !captured || !name.trim()}
+                    disabled={loading || !captured || !studentId || !enrollmentId}
                     className={`w-full py-3 px-4 rounded-lg text-white font-medium transition-colors ${
-                      loading || !captured || !name.trim()
+                      loading || !captured || !studentId || !enrollmentId
                         ? 'bg-gray-400 cursor-not-allowed'
                         : 'bg-blue-600 hover:bg-blue-700'
                     }`}
