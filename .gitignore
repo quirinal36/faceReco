@@ -56,8 +56,10 @@ venv.bak/
 *.pb
 
 # Environment variables
-.env
-.env.local
+.env*
+!.env.example
+*.token
+*.secret
 
 # Testing
 .coverage
@@ -67,13 +69,18 @@ htmlcov/
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Face data (privacy)
-# 실제 얼굴 데이터는 제외하되, 디렉토리 구조는 유지
-backend/data/face_database.json
-backend/data/embeddings/*.npy
-backend/data/faces/*.jpg
-backend/data/faces/*.png
-backend/data/faces/*.jpeg
+# Face and attendance data (privacy): deny every runtime artifact and selectively
+# keep only documentation/directory placeholders. This also covers SQLite
+# journals/WAL files, backups, temporary files, and future biometric formats.
+backend/data/*
+!backend/data/README.md
+!backend/data/.gitkeep
+!backend/data/embeddings/
+!backend/data/faces/
+backend/data/embeddings/*
+backend/data/faces/*
+!backend/data/embeddings/.gitkeep
+!backend/data/faces/.gitkeep
 
 # 기타 얼굴 데이터 디렉토리
 faces/

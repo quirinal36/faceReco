@@ -1,5 +1,26 @@
 # Face Recognition API Guide
 
+The edge API is a local biometric-data service. It is not supported on the public
+internet. See [Security & Privacy Operations](./docs/SECURITY.md) before enabling
+anything beyond loopback development.
+
+## Authentication and roles
+
+Configure two different random credentials of at least 32 characters before
+startup (`FACERECO_OPERATOR_TOKEN` / `FACERECO_DEVICE_TOKEN`, or their protected
+`*_FILE` forms). Examples below assume the operator credential is already in the
+shell as `FACERECO_OPERATOR_TOKEN`; they never show or print its value.
+
+- `operator`: enrollment, face list and authenticated thumbnails, delete/merge,
+  camera/stream, and attendance management.
+- `device`: the single local device's liveness calls only.
+- `GET /api/health`: the only unauthenticated API endpoint.
+- `GET /api/auth/whoami`: validates either credential and returns its role.
+
+Every protected request uses `Authorization: Bearer ...`. Never append a token to
+a URL or query string. The browser UI asks for one token, validates its role, and
+retains it only for the current tab session; there is no `VITE_*` token setting.
+
 ## 🚀 Starting the Server
 
 ### Method 1: Using app.py (Recommended)
@@ -17,14 +38,21 @@ python server.py
 ### Method 3: Running Uvicorn Directly
 ```bash
 cd backend
-uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+uvicorn server:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+Loopback is the default and required production listener. Never use `0.0.0.0` or
+a public address. A development-only trusted LAN/VPN bind requires one explicit
+private address plus the server's explicit opt-in; production edge interaction
+with Edu Manager is outbound HTTPS only.
 
 ## 📡 Connection Information
 
-- **API Server**: http://localhost:8000
-- **API Documentation (Swagger UI)**: http://localhost:8000/docs
-- **API Documentation (ReDoc)**: http://localhost:8000/redoc
+- **API Server**: http://127.0.0.1:8000
+- **API Documentation (development only)**: http://127.0.0.1:8000/docs
+- **ReDoc (development only)**: http://127.0.0.1:8000/redoc
+
+Production disables Swagger, ReDoc, and the OpenAPI document.
 
 ## 📚 API Endpoints
 
@@ -38,18 +66,7 @@ GET /api/health
 **Response Example:**
 ```json
 {
-  "status": "healthy",
-  "model_info": {
-    "model_name": "buffalo_l",
-    "device": "cpu",
-    "embedding_size": 512,
-    "det_size": [640, 640]
-  },
-  "database_info": {
-    "total_faces": 5,
-    "total_recognitions": 120,
-    "threshold": 0.5
-  }
+  "status": "healthy"
 }
 ```
 
@@ -60,16 +77,22 @@ Register a new face in the database
 
 ```http
 POST /api/face/register
+Authorization: Bearer <operator-token>
 Content-Type: multipart/form-data
 ```
 
 **Parameters:**
 - `name` (string, required): Name of the person to register
-- `file` (file, required): Face image file (JPEG, PNG)
+- `file` (file, required): Face image file (JPEG, PNG), at most 5 MiB
+
+The HTTP client must send `Content-Length` (cURL, browsers, and `requests` do so
+for ordinary multipart files). Chunked uploads are rejected, and the complete
+multipart body is bounded to keep raw frames out of OS temporary storage.
 
 **cURL Example:**
 ```bash
-curl -X POST "http://localhost:8000/api/face/register" \
+curl -X POST "http://127.0.0.1:8000/api/face/register" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}" \
   -F "name=홍길동" \
   -F "file=@/path/to/photo.jpg"
 ```
@@ -77,12 +100,14 @@ curl -X POST "http://localhost:8000/api/face/register" \
 **Python Example:**
 ```python
 import requests
+import os
 
-url = "http://localhost:8000/api/face/register"
+url = "http://127.0.0.1:8000/api/face/register"
 files = {"file": open("photo.jpg", "rb")}
 data = {"name": "홍길동"}
+headers = {"Authorization": f"Bearer {os.environ['FACERECO_OPERATOR_TOKEN']}"}
 
-response = requests.post(url, files=files, data=data)
+response = requests.post(url, headers=headers, files=files, data=data)
 print(response.json())
 ```
 
@@ -90,9 +115,9 @@ print(response.json())
 ```json
 {
   "success": true,
-  "face_id": "person_20260206_153045",
+  "face_id": "person_5d388b09d4ae48df8a07fc362e438f10",
   "name": "홍길동",
-  "message": "'홍길동' 얼굴이 성공적으로 등록되었습니다."
+  "message": "Face registration completed."
 }
 ```
 
@@ -102,7 +127,7 @@ print(response.json())
   "success": false,
   "face_id": null,
   "name": null,
-  "message": "이미지에서 얼굴을 감지할 수 없습니다. 다른 이미지를 시도해주세요."
+  "message": "Exactly one face must be visible in the image."
 }
 ```
 
@@ -113,11 +138,13 @@ Retrieve all registered face information
 
 ```http
 GET /api/faces/list
+Authorization: Bearer <operator-token>
 ```
 
 **cURL Example:**
 ```bash
-curl -X GET "http://localhost:8000/api/faces/list"
+curl "http://127.0.0.1:8000/api/faces/list" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}"
 ```
 
 **Response Example:**
@@ -126,23 +153,35 @@ curl -X GET "http://localhost:8000/api/faces/list"
   "total": 3,
   "faces": [
     {
-      "face_id": "person_20260206_153045",
+      "face_id": "person_5d388b09d4ae48df8a07fc362e438f10",
       "name": "홍길동",
       "registered_at": "2026-02-06T15:30:45.123456",
       "last_seen": "2026-02-06T16:20:10.654321",
       "recognition_count": 25,
-      "image_path": "faces/person_20260206_153045.jpg"
+      "thumbnail_url": "/api/faces/person_5d388b09d4ae48df8a07fc362e438f10/thumbnail",
+      "sample_count": 2
     },
     {
-      "face_id": "person_20260206_140530",
+      "face_id": "person_22faf885bc414675807ee29b3db0f327",
       "name": "김철수",
       "registered_at": "2026-02-06T14:05:30.789012",
       "last_seen": null,
       "recognition_count": 0,
-      "image_path": "faces/person_20260206_140530.jpg"
+      "thumbnail_url": null,
+      "sample_count": 1
     }
   ]
 }
+```
+
+`thumbnail_url` is an API route, never a storage path. It requires the same
+operator header and returns a bounded, non-cacheable image. There is no `/data`
+static route:
+
+```bash
+curl "http://127.0.0.1:8000/api/faces/person_5d388b09d4ae48df8a07fc362e438f10/thumbnail" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}" \
+  --output thumbnail.jpg
 ```
 
 ---
@@ -152,6 +191,7 @@ Delete a registered face
 
 ```http
 DELETE /api/face/{face_id}
+Authorization: Bearer <operator-token>
 ```
 
 **Parameters:**
@@ -159,22 +199,23 @@ DELETE /api/face/{face_id}
 
 **cURL Example:**
 ```bash
-curl -X DELETE "http://localhost:8000/api/face/person_20260206_153045"
+curl -X DELETE "http://127.0.0.1:8000/api/face/person_5d388b09d4ae48df8a07fc362e438f10" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}"
 ```
 
 **Response Example (Success):**
 ```json
 {
   "success": true,
-  "face_id": "person_20260206_153045",
-  "message": "얼굴 ID 'person_20260206_153045'가 성공적으로 삭제되었습니다."
+  "face_id": "person_5d388b09d4ae48df8a07fc362e438f10",
+  "message": "Face data was deleted."
 }
 ```
 
 **Response Example (Failure):**
 ```json
 {
-  "detail": "얼굴 ID 'invalid_id'를 찾을 수 없습니다."
+  "detail": "Face not found"
 }
 ```
 
@@ -185,43 +226,20 @@ Real-time face recognition video stream
 
 ```http
 GET /api/camera/stream
+Authorization: Bearer <operator-token>
 ```
 
-**Usage:**
+**Authenticated connectivity check:**
 
-#### Using in HTML:
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <title>얼굴 인식 스트리밍</title>
-</head>
-<body>
-    <h1>실시간 얼굴 인식</h1>
-    <img src="http://localhost:8000/api/camera/stream"
-         alt="Video Stream"
-         width="640"
-         height="480">
-</body>
-</html>
+```bash
+curl --max-time 5 "http://127.0.0.1:8000/api/camera/stream" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}" \
+  --output /dev/null
 ```
 
-#### Using in React:
-```jsx
-function VideoStream() {
-  return (
-    <div>
-      <h1>실시간 얼굴 인식</h1>
-      <img
-        src="http://localhost:8000/api/camera/stream"
-        alt="Video Stream"
-        width={640}
-        height={480}
-      />
-    </div>
-  );
-}
-```
+A plain HTML/React `<img src>` does not attach the bearer header. Use the
+application's authenticated stream client. Never work around the header by
+placing the token in the stream URL.
 
 **Features:**
 - Streaming in MJPEG format
@@ -237,18 +255,21 @@ function VideoStream() {
 
 ```bash
 # 1. Health check
-curl http://localhost:8000/api/health
+curl http://127.0.0.1:8000/api/health
 
 # 2. Register face (using test image)
-curl -X POST "http://localhost:8000/api/face/register" \
+curl -X POST "http://127.0.0.1:8000/api/face/register" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}" \
   -F "name=테스트" \
   -F "file=@test_image.jpg"
 
 # 3. Check face list
-curl http://localhost:8000/api/faces/list
+curl "http://127.0.0.1:8000/api/faces/list" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}"
 
-# 4. Check video stream (in browser)
-# http://localhost:8000/api/camera/stream
+# 4. Verify the token role
+curl "http://127.0.0.1:8000/api/auth/whoami" \
+  -H "Authorization: Bearer ${FACERECO_OPERATOR_TOKEN}"
 ```
 
 ### 2. Python Client Example
@@ -256,9 +277,11 @@ curl http://localhost:8000/api/faces/list
 ```python
 import requests
 import json
+import os
 
 # Server address
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://127.0.0.1:8000"
+HEADERS = {"Authorization": f"Bearer {os.environ['FACERECO_OPERATOR_TOKEN']}"}
 
 # 1. Health check
 response = requests.get(f"{BASE_URL}/api/health")
@@ -268,19 +291,21 @@ print("헬스체크:", json.dumps(response.json(), indent=2, ensure_ascii=False)
 with open("photo.jpg", "rb") as f:
     files = {"file": f}
     data = {"name": "홍길동"}
-    response = requests.post(f"{BASE_URL}/api/face/register", files=files, data=data)
+    response = requests.post(
+        f"{BASE_URL}/api/face/register", headers=HEADERS, files=files, data=data
+    )
     print("등록 결과:", json.dumps(response.json(), indent=2, ensure_ascii=False))
 
 # 3. Retrieve face list
-response = requests.get(f"{BASE_URL}/api/faces/list")
+response = requests.get(f"{BASE_URL}/api/faces/list", headers=HEADERS)
 faces = response.json()
 print(f"등록된 얼굴 수: {faces['total']}")
 for face in faces['faces']:
     print(f"  - {face['name']} (ID: {face['face_id']})")
 
 # 4. Delete face
-face_id = "person_20260206_153045"
-response = requests.delete(f"{BASE_URL}/api/face/{face_id}")
+face_id = "person_5d388b09d4ae48df8a07fc362e438f10"
+response = requests.delete(f"{BASE_URL}/api/face/{face_id}", headers=HEADERS)
 print("삭제 결과:", json.dumps(response.json(), indent=2, ensure_ascii=False))
 ```
 
@@ -296,18 +321,20 @@ Solution:
 - Change camera_id in backend/api/routes.py (default: 0)
 ```
 
-### Issue: Model download error
+### Issue: Model artifacts are missing
 ```
 Solution:
-- Check internet connection
-- InsightFace model downloads automatically (~200MB)
-- First run may take some time
+- Do not open production edge internet access for an automatic download
+- Provision and verify the approved model on a controlled staging/build host
+- Copy the frozen bundle to FACERECO_MODEL_ROOT/models/buffalo_l/*.onnx (or the
+  directory matching the approved FACERECO_MODEL_NAME)
 ```
 
 ### Issue: CORS error
 ```
 Solution:
-- Add frontend URL to origins list in backend/server.py
+- Set FACERECO_CORS_ORIGINS to the exact UI origin (scheme, host, and port)
+- Do not use a wildcard; localhost and 127.0.0.1 are different origins
 - Clear browser cache and retry
 ```
 
@@ -347,11 +374,12 @@ database = FaceDatabase(threshold=0.4)
 
 ## 📝 Additional Information
 
-- **Auto-generated API Documentation**: http://localhost:8000/docs
+- **Development-only API Documentation**: http://127.0.0.1:8000/docs
+- **Security and privacy operations**: [docs/SECURITY.md](./docs/SECURITY.md)
 - **GitHub Repository**: [Project Link]
 - **Issue Reporting**: GitHub Issues
 
 ---
 
-**Written**: 2026-02-06
+**Updated**: 2026-08-16
 **Version**: 1.0.0

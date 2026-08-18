@@ -1,13 +1,17 @@
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { AUTH_ROLES } from '../auth/session';
+import useAuth from '../auth/useAuth';
 
 function Sidebar({ isOpen, onClose }) {
   const { t } = useTranslation();
+  const { role } = useAuth();
 
   const navItems = [
     {
       path: '/',
       name: t('nav.dashboard'),
+      roles: [AUTH_ROLES.OPERATOR],
       icon: (
         <svg
           className="w-5 h-5"
@@ -27,6 +31,7 @@ function Sidebar({ isOpen, onClose }) {
     {
       path: '/register',
       name: t('nav.register'),
+      roles: [AUTH_ROLES.OPERATOR],
       icon: (
         <svg
           className="w-5 h-5"
@@ -46,6 +51,7 @@ function Sidebar({ isOpen, onClose }) {
     {
       path: '/faces',
       name: t('nav.faceList'),
+      roles: [AUTH_ROLES.OPERATOR],
       icon: (
         <svg
           className="w-5 h-5"
@@ -65,6 +71,7 @@ function Sidebar({ isOpen, onClose }) {
     {
       path: '/attendance',
       name: t('nav.attendance'),
+      roles: [AUTH_ROLES.OPERATOR],
       icon: (
         <svg
           className="w-5 h-5"
@@ -84,6 +91,7 @@ function Sidebar({ isOpen, onClose }) {
     {
       path: '/liveness',
       name: t('nav.liveness'),
+      roles: [AUTH_ROLES.DEVICE],
       icon: (
         <svg
           className="w-5 h-5"
@@ -134,7 +142,7 @@ function Sidebar({ isOpen, onClose }) {
         </div>
 
         <nav className="p-4 space-y-2">
-          {navItems.map((item) => (
+          {navItems.filter((item) => item.roles.includes(role)).map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

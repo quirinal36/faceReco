@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import AuthenticatedMjpeg from '../components/AuthenticatedMjpeg';
 import { faceAPI } from '../services/api';
 
 function Dashboard() {
@@ -12,16 +13,13 @@ function Dashboard() {
     fps: 0,
     recognized_faces: []
   });
-  const streamUrl = faceAPI.getCameraStreamUrl();
-
   // 컴포넌트 마운트 시 백엔드 카메라 재시작
   useEffect(() => {
     const startBackendCamera = async () => {
       try {
         await faceAPI.reopenCamera();
-        console.log('백엔드 카메라가 시작되었습니다.');
-      } catch (error) {
-        console.warn('백엔드 카메라 시작 실패:', error.message);
+      } catch {
+        // Stream startup reports camera availability to the user.
       }
     };
 
@@ -41,9 +39,8 @@ function Dashboard() {
           fps: response.data.fps,
           recognized_faces: response.data.recognized_faces || []
         });
-      } catch (error) {
-        // 통계 가져오기 실패 시 무시 (스트림이 시작되지 않았을 수 있음)
-        console.debug('Stats fetch failed:', error.message);
+      } catch {
+        // A transient stats failure does not interrupt the camera stream.
       }
     };
 
@@ -68,7 +65,7 @@ function Dashboard() {
     setIsStreaming(false);
   };
 
-  const handleStreamLoad = () => {
+  const handleStreamFrame = () => {
     setIsStreaming(true);
     setError(null);
   };
@@ -123,12 +120,11 @@ function Dashboard() {
                 </div>
               </div>
             ) : (
-              <img
-                src={streamUrl}
+              <AuthenticatedMjpeg
                 alt="Camera Stream"
                 className="w-full h-full object-contain"
                 onError={handleStreamError}
-                onLoad={handleStreamLoad}
+                onFrame={handleStreamFrame}
               />
             )}
           </div>

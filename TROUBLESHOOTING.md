@@ -239,25 +239,28 @@ pip install onnxruntime==1.16.0
 
 ---
 
-### 문제: 모델 다운로드 실패
+### 문제: 준비된 모델 artifact가 없음
 
 **증상**:
 ```
-RuntimeError: Failed to download model: buffalo_l
+RuntimeError: InsightFace model could not be loaded
 ```
 
-**원인**: 인터넷 연결 문제 또는 방화벽
+**원인**: 승인된 model bundle이 준비되지 않았거나 불완전하거나
+`$FACERECO_MODEL_ROOT/models/$FACERECO_MODEL_NAME/`과 일치하지 않습니다.
 
 **해결**:
-1. 네트워크 연결 확인
-2. 프록시 설정 (필요시)
-   ```bash
-   export HTTP_PROXY=http://proxy:port
-   export HTTPS_PROXY=http://proxy:port
-   ```
-3. 수동 다운로드:
-   - [InsightFace Model Zoo](https://github.com/deepinsight/insightface/tree/master/model_zoo)
-   - `~/.insightface/models/` 디렉토리에 저장
+1. 운영 edge에 일반 internet 또는 proxy 접근을 허용하지 않습니다.
+2. 통제된 staging/build 호스트에서 승인된 InsightFace 버전을 받고 release
+   checksum manifest와 대조한 뒤 artifact를 검사합니다.
+3. 고정된 bundle을 edge의 암호화 저장소로 전송합니다. 기본 layout은
+   `$FACERECO_MODEL_ROOT/models/buffalo_l/*.onnx`이며 다른 승인 모델은
+   `FACERECO_MODEL_NAME`과 일치하는 디렉터리를 사용합니다.
+4. 서비스 계정의 read 권한을 확인하고 재시작합니다. 운영 edge는 실행 중
+   모델을 다운로드하면 안 됩니다.
+
+[보안 및 개인정보 운영 가이드](./docs/SECURITY.md#model-artifacts-and-egress)를
+참고하세요.
 
 ---
 

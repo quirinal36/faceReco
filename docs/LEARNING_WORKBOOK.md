@@ -521,10 +521,10 @@ app = FastAPI()
 # CORS 설정 (프론트엔드 접근 허용)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 모든 오리진 허용 (개발 시)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["https://127.0.0.1:5173"],  # 정확한 UI origin
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # GET 엔드포인트
@@ -544,8 +544,13 @@ async def register_face(name: str, image: bytes):
 # 서버 실행
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
 ```
+
+이 학습용 예시는 간결성을 위해 인증 연결 코드를 생략했습니다. 실제
+FaceReco에서는 생체정보·출석정보를 읽거나 변경하는 모든 route가 operator 또는
+device Bearer 역할을 강제해야 하며 CORS는 인증이 아닙니다. Edge API를 인터넷에
+공개하지 마세요.
 
 **우리 프로젝트의 API 설계 (Milestone 4)**
 ```
@@ -778,7 +783,7 @@ A:
    ↓
 5. 서버: 얼굴 임베딩 추출
    ↓
-6. 서버: DB에 저장 (이름 + 임베딩 + 이미지)
+6. 서버: 비공개 저장소에 저장 (이름 + 임베딩 + 필요한 경우 얼굴만 자른 썸네일)
    ↓
 7. 서버: 성공 응답
    ↓
@@ -820,23 +825,25 @@ A:
 **옵션 1: SQLite (간단한 프로젝트)**
 ```sql
 CREATE TABLE faces (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY,  -- 외부에 노출해도 경로를 유추할 수 없는 불투명 ID
     name TEXT NOT NULL,
     embedding BLOB,  -- 512차원 벡터 (직렬화)
-    image_path TEXT,
+    has_thumbnail BOOLEAN NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+임베딩과 썸네일은 모두 생체정보다. 공개 정적 경로에 두지 말고, 암호화된 저장소와 최소 권한(디렉터리 `0700`, 파일 `0600`)을 사용한다.
 
 **옵션 2: JSON 파일 (더 간단)**
 ```json
 {
   "faces": [
     {
-      "id": 1,
-      "name": "홍길동",
+      "id": "7ce78075-8f1d-4f6a-a7de-5dd8f59075f2",
+      "name": "합성 데모 사용자",
       "embedding": [0.1, 0.2, ..., 0.5],  // 512개
-      "image_path": "faces/1.jpg",
+      "has_thumbnail": true,
       "created_at": "2026-02-06T12:00:00"
     }
   ]
@@ -874,13 +881,13 @@ def find_matching_face(query_embedding, database_embeddings, threshold=0.6):
 Q: 얼굴 이미지를 DB에 저장해야 하는가?
 A:
    - 임베딩만 저장: 빠름, 용량 적음, 이미지 확인 불가
-   - 이미지도 저장: 느림, 용량 많음, 이미지 확인 가능
-   → 둘 다 저장 추천 (임베딩 + 이미지 경로)
+   - 썸네일도 저장: 운영상 확인이 필요할 때만 얼굴 영역을 작게 잘라 저장
+   → 원본 프레임은 저장하지 않는다. 썸네일이 꼭 필요하면 임베딩과 함께 암호화된 비공개 저장소에 보관하고 인증된 API로만 제공한다.
 
 Q: 임베딩 벡터를 어떻게 저장하는가?
 A:
    - NumPy array를 bytes로 직렬화
-   - pickle, JSON, 또는 전용 벡터 DB
+   - `allow_pickle=False`인 NPY, 검증된 BLOB 형식, 또는 전용 벡터 DB
 
 Q: 등록된 얼굴이 1000명이면 인식 속도는?
 A:
@@ -907,15 +914,15 @@ try:
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         raise Exception("카메라를 열 수 없습니다")
-except Exception as e:
-    logger.error(f"카메라 에러: {e}")
+except Exception:
+    logger.error("camera_unavailable")
     # 사용자에게 알림
 
 # 2. 모델 로드 에러
 try:
     model = load_model("model_name")
-except Exception as e:
-    logger.error(f"모델 로드 실패: {e}")
+except Exception:
+    logger.error("model_load_failed")
     # 대체 모델 사용 또는 종료
 
 # 3. API 에러
@@ -924,11 +931,11 @@ async def register_face(name: str, image: UploadFile):
     try:
         # 얼굴 등록 로직
         ...
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"얼굴 등록 실패: {e}")
-        raise HTTPException(status_code=500, detail="서버 에러")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="잘못된 등록 요청입니다") from None
+    except Exception:
+        logger.error("face_registration_failed")
+        raise HTTPException(status_code=500, detail="서버 에러") from None
 ```
 
 **로깅 설정**

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, SYNTHETIC_OPERATOR_TOKEN, test } from './fixtures.js';
 
 /**
  * 얼굴 등록 API 통합 테스트
@@ -44,8 +44,7 @@ test.describe('얼굴 등록 API 통합', () => {
       };
 
       // getUserMedia 모킹
-      navigator.mediaDevices.getUserMedia = async (constraints) => {
-        console.log('Mock getUserMedia called with:', constraints);
+      navigator.mediaDevices.getUserMedia = async () => {
         return createFakeVideoStream();
       };
     });
@@ -73,7 +72,8 @@ test.describe('얼굴 등록 API 통합', () => {
     await expect(page.locator('video')).toBeVisible({ timeout: 3000 });
     await page.keyboard.press('Space');
     await expect(page.locator('img[alt="Captured"]')).toBeVisible({ timeout: 2000 });
-    await page.locator('input#name').fill('테스트 사용자');
+    await page.locator('select#student').selectOption('student-1');
+    await page.locator('select#enrollment').selectOption('enrollment-1');
 
     // 등록 버튼 클릭
     await page.locator('button:has-text("얼굴 등록")').click();
@@ -103,7 +103,8 @@ test.describe('얼굴 등록 API 통합', () => {
     await expect(page.locator('video')).toBeVisible({ timeout: 3000 });
     await page.keyboard.press('Space');
     await expect(page.locator('img[alt="Captured"]')).toBeVisible({ timeout: 2000 });
-    await page.locator('input#name').fill('테스트 사용자');
+    await page.locator('select#student').selectOption('student-1');
+    await page.locator('select#enrollment').selectOption('enrollment-1');
 
     // 등록 버튼 클릭
     await page.locator('button:has-text("얼굴 등록")').click();
@@ -179,6 +180,7 @@ test.describe('얼굴 등록 API 통합', () => {
     // FormData 검증 (헤더 확인)
     const headers = capturedRequest.headers();
     expect(headers['content-type']).toContain('multipart/form-data');
+    expect(headers.authorization).toBe(`Bearer ${SYNTHETIC_OPERATOR_TOKEN}`);
   });
 
   test('로딩 상태 확인', async ({ page }) => {
@@ -246,7 +248,7 @@ test.describe('네트워크 오류 처리', () => {
 
   test('타임아웃 처리', async ({ page }) => {
     // 타임아웃 시뮬레이션 (응답 없음)
-    await page.route('**/api/face/register', async (route) => {
+    await page.route('**/api/face/register', async () => {
       // 응답하지 않음 (타임아웃 발생)
       await new Promise(() => {}); // 무한 대기
     });

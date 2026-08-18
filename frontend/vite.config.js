@@ -6,7 +6,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 export default defineConfig({
   plugins: [react(), basicSsl()],
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 5173,
     https: true,
     proxy: {
@@ -16,10 +16,10 @@ export default defineConfig({
         // MJPEG 스트리밍을 위한 타임아웃 비활성화
         timeout: 0,
       },
-      '/data': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-      },
     },
+  },
+  preview: {
+    host: '127.0.0.1',
+    port: 4173,
   },
 })

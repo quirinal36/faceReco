@@ -5,10 +5,62 @@ InsightFace를 이용한 얼굴 임베딩 추출 및 인식
 """
 
 import cv2
+import logging
 import numpy as np
+import os
+import re
+from pathlib import Path
 from typing import Optional, Tuple, List, Dict
 from sklearn.metrics.pairwise import cosine_similarity
+from security import get_environment
 from utils.text_utils import put_korean_text, get_text_size
+
+
+logger = logging.getLogger(__name__)
+SAFE_MODEL_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def validate_model_artifacts(model_name: Optional[str] = None) -> Optional[Path]:
+    """Require locally provisioned model artifacts in production.
+
+    InsightFace downloads missing models on first use. Production edges use an
+    outbound allowlist, so startup must fail before serving traffic when the
+    model bundle has not already been placed on disk.
+    """
+    model_root = os.getenv("FACERECO_MODEL_ROOT", "").strip()
+    bundle_name = (
+        model_name
+        or os.getenv("FACERECO_MODEL_NAME", "").strip()
+        or "buffalo_l"
+    )
+    if not SAFE_MODEL_NAME.fullmatch(bundle_name):
+        raise RuntimeError("FACERECO_MODEL_NAME is invalid")
+    production = get_environment() == "production"
+    if not production:
+        return Path(model_root).expanduser() if model_root else None
+
+    root_path = Path(model_root).expanduser() if model_root else None
+    bundle_path = (
+        root_path / "models" / bundle_name if root_path is not None else None
+    )
+    provisioned = (
+        root_path is not None
+        and root_path.is_dir()
+        and not root_path.is_symlink()
+        and bundle_path is not None
+        and bundle_path.is_dir()
+        and not bundle_path.is_symlink()
+    )
+    if provisioned:
+        provisioned = any(
+            artifact.is_file() and not artifact.is_symlink()
+            for artifact in bundle_path.glob("*.onnx")
+        )
+    if not provisioned:
+        raise RuntimeError(
+            "Production model artifacts must be provisioned before startup"
+        )
+    return root_path
 
 
 class FaceRecognizer:
@@ -36,8 +88,21 @@ class FaceRecognizer:
             device (str): 실행 디바이스 ('auto', 'cuda', 'cpu')
             det_size (Tuple[int, int]): 얼굴 감지 입력 크기
         """
-        self.model_name = model_name or 'default'
+        self.model_name = (
+            model_name
+            or os.getenv("FACERECO_MODEL_NAME", "").strip()
+            or "buffalo_l"
+        )
         self.det_size = det_size
+        production = get_environment() == "production"
+        configured_root = validate_model_artifacts(self.model_name)
+        model_root = str(configured_root) if configured_root is not None else ""
+
+        def create_analysis(name: str):
+            options = {"name": name}
+            if model_root:
+                options["root"] = str(Path(model_root).expanduser())
+            return FaceAnalysis(**options)
 
         # InsightFace import (지연 로딩)
         try:
@@ -59,7 +124,7 @@ class FaceRecognizer:
                 else:
                     ctx_id = -1  # CPU
                     self.device = 'cpu'
-            except:
+            except Exception:
                 ctx_id = -1
                 self.device = 'cpu'
         elif device == 'cuda':
@@ -69,43 +134,42 @@ class FaceRecognizer:
             ctx_id = -1
             self.device = 'cpu'
 
-        print(f"얼굴 인식 초기화 중... (모델: {self.model_name}, 디바이스: {self.device})")
-
         # InsightFace 모델 로드
         try:
             # InsightFace 0.2.1 (구버전)과의 호환성 처리
             import insightface
             version = getattr(insightface, '__version__', '0.2.1')
 
-            if version.startswith('0.2'):
+            if production:
+                # The exact directory was checked above. Selecting only this
+                # bundle prevents InsightFace from falling back to another
+                # model name and attempting a runtime download.
+                self.app = create_analysis(self.model_name)
+            elif version.startswith('0.2'):
                 # 구버전: retinaface와 arcface 모델 조합 사용
-                print(f"InsightFace 구버전 감지 (v{version}), retinaface-arcface 모델 사용")
                 # 구버전에서는 빈 문자열 또는 특정 모델명 필요
                 # name='antelopev2'를 시도하거나, 빈 문자열 사용
                 try:
-                    self.app = FaceAnalysis(name='')
-                except:
+                    self.app = create_analysis('')
+                except Exception:
                     # 빈 문자열도 안 되면 기본 모델 시도
                     try:
-                        self.app = FaceAnalysis(name='antelopev2')
-                    except:
+                        self.app = create_analysis('antelopev2')
+                    except Exception:
                         # 마지막 시도: retinaface_r50_v1
-                        self.app = FaceAnalysis(name='retinaface_r50_v1')
+                        self.app = create_analysis('retinaface_r50_v1')
             else:
                 # 최신 버전: buffalo 모델 사용
-                if model_name:
-                    self.app = FaceAnalysis(name=model_name)
-                else:
-                    self.app = FaceAnalysis(name='buffalo_l')
+                self.app = create_analysis(self.model_name)
 
             self.app.prepare(ctx_id=ctx_id, det_size=det_size)
-            print(f"얼굴 인식기 초기화 완료")
+            logger.info("face_model_ready")
 
             # 임베딩 크기 설정 (일반적으로 512차원)
             self.embedding_size = 512
 
-        except Exception as e:
-            raise RuntimeError(f"InsightFace 모델 로드 실패: {str(e)}")
+        except Exception as exc:
+            raise RuntimeError("InsightFace model could not be loaded") from exc
 
     def extract_embedding(
         self,

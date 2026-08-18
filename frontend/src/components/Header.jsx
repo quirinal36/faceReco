@@ -1,8 +1,10 @@
 import { useTranslation } from 'react-i18next';
+import useAuth from '../auth/useAuth';
 import LanguageSwitcher from './LanguageSwitcher';
 
 function Header({ onMenuToggle }) {
   const { t } = useTranslation();
+  const { logout, role } = useAuth();
 
   return (
     <header className="bg-white shadow-sm">
@@ -41,8 +43,18 @@ function Header({ onMenuToggle }) {
             </div>
             <h1 className="text-lg sm:text-2xl font-bold text-gray-800">{t('app.title')}</h1>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <span className="hidden text-sm text-gray-500 sm:inline">
+              {t(`auth.roles.${role}`)}
+            </span>
             <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-100"
+            >
+              {t('auth.signOut')}
+            </button>
           </div>
         </div>
       </div>

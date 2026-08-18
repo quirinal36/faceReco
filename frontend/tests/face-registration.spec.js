@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 /**
  * 얼굴 등록 프로세스 E2E 테스트
@@ -44,10 +44,7 @@ test.describe('얼굴 등록 프로세스', () => {
       };
 
       // getUserMedia 모킹
-      const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-      navigator.mediaDevices.getUserMedia = async (constraints) => {
-        console.log('Mock getUserMedia called with:', constraints);
-
+      navigator.mediaDevices.getUserMedia = async () => {
         // 실제 비디오 스트림 생성
         const stream = createFakeVideoStream();
 
@@ -119,10 +116,11 @@ test.describe('얼굴 등록 프로세스', () => {
     const step2 = page.locator('text=얼굴 촬영').locator('..').locator('..');
     await expect(step2.locator('.bg-green-500')).toBeVisible();
 
-    // 3단계: 이름 입력
-    const nameInput = page.locator('input#name');
-    await expect(nameInput).toBeEnabled();
-    await nameInput.fill('테스트 사용자');
+    // 3단계: 학생과 수강반 연결
+    const studentSelect = page.locator('select#student');
+    await expect(studentSelect).toBeEnabled();
+    await studentSelect.selectOption('student-1');
+    await page.locator('select#enrollment').selectOption('enrollment-1');
 
     // 등록 절차 3단계 활성화 확인
     const step3 = page.locator('text=이름 입력').locator('..').locator('..');
