@@ -365,6 +365,13 @@ Jetson 등 ARM 장비에서는 해당 JetPack/CUDA 버전에 맞는 NVIDIA 제�
 빌드를 사용하세요. 설치 후 `python backend/test_installation.py`에서
 `CUDAExecutionProvider`가 표시되어야 합니다.
 
+이 저장소의 배포 장비에서 직접 빌드한 wheel이 있다면, PyPI 패키지 대신 그 wheel을
+설치합니다.
+
+```bash
+python -m pip install /tmp/onnxruntime/build/Linux/Release/dist/onnxruntime_gpu-1.30.0-cp312-cp312-linux_aarch64.whl
+```
+
 ### 임계값 조정
 얼굴 인식 임계값 조정 (backend/models/face_database.py):
 

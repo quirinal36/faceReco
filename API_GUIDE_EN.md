@@ -366,6 +366,13 @@ On ARM devices such as Jetson, use the NVIDIA ONNX Runtime build compatible
 with the installed JetPack/CUDA version. `python backend/test_installation.py`
 must report `CUDAExecutionProvider`.
 
+When a wheel was built directly on the deployment host, install that wheel
+instead of a generic PyPI build:
+
+```bash
+python -m pip install /tmp/onnxruntime/build/Linux/Release/dist/onnxruntime_gpu-1.30.0-cp312-cp312-linux_aarch64.whl
+```
+
 ### Threshold Adjustment
 Adjust face recognition threshold (backend/models/face_database.py):
 

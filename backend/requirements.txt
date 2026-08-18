@@ -31,7 +31,7 @@ onnx==1.20.1
 # Install the CUDA-enabled build appropriate for the local GPU/JetPack image.
 # It must expose CUDAExecutionProvider; CPU-only onnxruntime is intentionally
 # rejected by backend/models/face_recognition.py.
-onnxruntime-gpu==1.23.2
+onnxruntime-gpu==1.30.0
 opencv-python==4.10.0.84
 packaging==26.0
 pillow==12.1.0
