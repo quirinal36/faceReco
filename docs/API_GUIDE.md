@@ -351,13 +351,19 @@ print("삭제 결과:", json.dumps(response.json(), indent=2, ensure_ascii=False
 
 ## 📊 성능 최적화
 
-### GPU 가속 (선택사항)
-CUDA가 설치된 시스템에서 GPU 가속 사용:
+### GPU 가속 (필수)
+
+이 백엔드는 로컬 CUDA GPU로만 얼굴 인식을 실행합니다. CPU fallback은 허용되지
+않으며, 시작 전 `CUDAExecutionProvider`를 제공하는 ONNX Runtime을 설치해야 합니다.
 
 ```bash
 pip uninstall onnxruntime
 pip install onnxruntime-gpu
 ```
+
+Jetson 등 ARM 장비에서는 해당 JetPack/CUDA 버전에 맞는 NVIDIA 제공 ONNX Runtime
+빌드를 사용하세요. 설치 후 `python backend/test_installation.py`에서
+`CUDAExecutionProvider`가 표시되어야 합니다.
 
 ### 임계값 조정
 얼굴 인식 임계값 조정 (backend/models/face_database.py):

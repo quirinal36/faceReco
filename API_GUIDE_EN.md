@@ -351,13 +351,20 @@ Solution:
 
 ## 📊 Performance Optimization
 
-### GPU Acceleration (Optional)
-Use GPU acceleration on systems with CUDA installed:
+### GPU Acceleration (Required)
+
+This backend runs biometric inference only on the local CUDA GPU. CPU fallback
+is rejected, so install an ONNX Runtime build that provides
+`CUDAExecutionProvider` before starting the service:
 
 ```bash
 pip uninstall onnxruntime
 pip install onnxruntime-gpu
 ```
+
+On ARM devices such as Jetson, use the NVIDIA ONNX Runtime build compatible
+with the installed JetPack/CUDA version. `python backend/test_installation.py`
+must report `CUDAExecutionProvider`.
 
 ### Threshold Adjustment
 Adjust face recognition threshold (backend/models/face_database.py):

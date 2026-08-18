@@ -77,7 +77,7 @@ class FaceRecognizer:
     def __init__(
         self,
         model_name: Optional[str] = None,
-        device: str = 'auto',
+        device: Optional[str] = None,
         det_size: Tuple[int, int] = (640, 640)
     ):
         """
@@ -85,7 +85,7 @@ class FaceRecognizer:
 
         Args:
             model_name (Optional[str]): InsightFace 모델 이름 (최신 버전에서만 사용, 구버전은 None)
-            device (str): 실행 디바이스 ('auto', 'cuda', 'cpu')
+            device (str): 실행 디바이스. 기본값은 FACERECO_DEVICE 또는 cuda
             det_size (Tuple[int, int]): 얼굴 감지 입력 크기
         """
         self.model_name = (
@@ -113,26 +113,24 @@ class FaceRecognizer:
                 "'pip install insightface onnxruntime'을 실행하세요."
             )
 
-        # 디바이스 설정
-        if device == 'auto':
-            # CUDA 사용 가능 여부 확인
-            try:
-                import onnxruntime as ort
-                if 'CUDAExecutionProvider' in ort.get_available_providers():
-                    ctx_id = 0  # GPU
-                    self.device = 'cuda'
-                else:
-                    ctx_id = -1  # CPU
-                    self.device = 'cpu'
-            except Exception:
-                ctx_id = -1
-                self.device = 'cpu'
-        elif device == 'cuda':
-            ctx_id = 0
-            self.device = 'cuda'
-        else:
-            ctx_id = -1
-            self.device = 'cpu'
+        # Biometric inference must use the local CUDA device.  A silent CPU
+        # fallback can make a deployed camera appear healthy while it cannot
+        # keep up with live frames, so fail before loading any model instead.
+        configured_device = (device or os.getenv("FACERECO_DEVICE", "cuda")).strip().lower()
+        if configured_device != "cuda":
+            raise RuntimeError("FACERECO_DEVICE must be set to cuda")
+        try:
+            import onnxruntime as ort
+            providers = ort.get_available_providers()
+        except Exception as error:
+            raise RuntimeError("CUDA-enabled ONNX Runtime is required") from error
+        if "CUDAExecutionProvider" not in providers:
+            raise RuntimeError(
+                "CUDAExecutionProvider is unavailable; install the CUDA-enabled "
+                "ONNX Runtime build for this host"
+            )
+        ctx_id = 0
+        self.device = "cuda"
 
         # InsightFace 모델 로드
         try:
