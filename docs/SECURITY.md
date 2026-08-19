@@ -131,6 +131,17 @@ and immediately after suspected disclosure:
 
 ## Model artifacts and egress
 
+### Local CUDA runtime
+
+Face recognition is CUDA-only. `FACERECO_DEVICE=cuda` is the supported setting;
+the backend refuses to initialize when ONNX Runtime does not expose
+`CUDAExecutionProvider`. The checked deployment host is a Jetson Orin with a
+locally built `onnxruntime_gpu-1.30.0` wheel that exposes both CUDA and
+TensorRT execution providers. Install the wheel matching the host's Python,
+architecture, CUDA, cuDNN, and TensorRT versions before deployment, then run
+`python backend/test_installation.py`. Do not substitute a CPU-only ONNX
+Runtime package to make the service start.
+
 Pre-provision approved InsightFace model artifacts before an edge starts. Download
 them only in a controlled staging/build environment, verify them against an
 approved version and checksum manifest, scan them, then transfer the frozen model

@@ -8,8 +8,25 @@
 > 비밀 파일 내용, 관리자 개인 연락처를 넣지 마세요. 필요하면 비공개 승인 채널과
 > 내부 사건 번호만 사용하세요.
 
-현재 코드 변경은 로컬 작업 트리에만 있으며, 커밋·푸시·Git 이력 재작성·GitHub
-이슈 수정은 아직 수행하지 않았습니다.
+## 0. 구현 동기화 현황 (2026-08-19)
+
+P0 코드 변경과 Edu Manager 연동은 커밋·푸시되어 draft PR
+[#25](https://github.com/quirinal36/faceReco/pull/25)에서 검토 중입니다.
+
+- [x] 공개 `/data` 정적 마운트를 제거하고, 인증된 썸네일 API로 교체했다.
+- [x] operator/device bearer 역할 분리, 업로드 제한, private storage 권한,
+  loopback binding, CORS allowlist를 구현했다.
+- [x] 얼굴 등록 시 Edu Manager 학생 및 월별 수강행을 연결하고, 인식 성공 시
+  Edu Manager 출석 API에만 기록한다. 로컬 출석 SQLite는 운영 경로에서 제거했다.
+- [x] 로컬 CUDA-only ONNX Runtime 정책을 구현했다. Jetson Orin에서 빌드한
+  `onnxruntime_gpu-1.30.0` wheel은 CUDA·TensorRT provider 노출을 확인했다.
+- [x] 프런트엔드 lint/build 및 Python 문법·diff 검사를 통과했다.
+- [ ] 전체 Python 회귀 테스트는 CUDA ONNX Runtime 등 backend 의존성을 실제
+  런타임 환경에 설치한 뒤 실행해야 한다.
+- [ ] 이전에 등록된 얼굴에는 Edu Manager `student_id`/`enrollment_id` 매핑이
+  없으므로 재등록 또는 운영자용 매핑 화면이 필요하다.
+
+Git 이력 재작성과 GitHub cache/fork/artifact 정리는 아직 수행하지 않았습니다.
 
 ## 1. 공개 Git 이력 사고 대응
 
@@ -110,9 +127,9 @@
 
 아래 항목을 답변으로 승인하면, 그 범위 안에서 후속 작업을 계속합니다.
 
-- [ ] 현재 변경을 검토 가능한 단일 커밋으로 만들기
-- [ ] 지정한 브랜치로 push하기
-- [ ] draft PR 만들기
+- [x] 현재 변경을 검토 가능한 단일 커밋으로 만들기
+- [x] 지정한 브랜치로 push하기
+- [x] draft PR 만들기 — #25
 - [ ] 이력 재작성 계획과 실행 명령을 준비하기
 - [ ] 명시적으로 승인된 ref만 대상으로 이력 재작성 및 force-push 수행하기
 - [ ] GitHub issue/PR에 비밀·생체정보를 제외한 상태 업데이트 초안 또는 댓글 작성
