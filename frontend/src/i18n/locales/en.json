@@ -19,7 +19,7 @@
     "stats": {
       "detected": "Detected Faces",
       "recognized": "Recognized",
-      "fps": "Processing Speed"
+      "fps": "Video Speed (FPS)"
     },
     "error": "Cannot load camera stream. Please make sure the backend server is running.",
     "retry": "Retry",
@@ -32,6 +32,12 @@
       "title": "Detected Faces",
       "unknown": "Unknown",
       "age": "Age {{age}}"
+    },
+    "demo": {
+      "badge": "DEMO · LOCAL CAMERA",
+      "title": "Demo mode:",
+      "description": "This checks the Electron window and local camera permission only. Face detection, recognition, and registration APIs will be enabled after the CUDA backend build finishes.",
+      "cameraError": "Cannot access the local camera. Check the operating system camera permission."
     }
   },
   "registration": {

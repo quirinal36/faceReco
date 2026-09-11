@@ -99,6 +99,21 @@ class FaceRecognizer:
                     self.app = FaceAnalysis(name='buffalo_l')
 
             self.app.prepare(ctx_id=ctx_id, det_size=det_size)
+            if self.device == 'cpu' and not version.startswith('0.2'):
+                # Each model otherwise owns a spinning pool using every CPU core.
+                # This InsightFace version does not forward sess_options, so replace
+                # its sessions explicitly after prepare() has selected the provider.
+                import onnxruntime as ort
+                options = ort.SessionOptions()
+                options.intra_op_num_threads = 2
+                options.inter_op_num_threads = 1
+                options.add_session_config_entry('session.intra_op.allow_spinning', '0')
+                options.add_session_config_entry('session.inter_op.allow_spinning', '0')
+                for model in self.app.models.values():
+                    model.session = ort.InferenceSession(
+                        model.model_file, sess_options=options,
+                        providers=['CPUExecutionProvider'],
+                    )
             print(f"얼굴 인식기 초기화 완료")
 
             # 임베딩 크기 설정 (일반적으로 512차원)

@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { faceAPI } from '../services/api';
 
 function Dashboard() {
   const { t } = useTranslation();
+  const isDemo = new URLSearchParams(window.location.search).has('demo');
+  const previewRef = useRef(null);
+  const previewStreamRef = useRef(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
@@ -14,8 +17,52 @@ function Dashboard() {
   });
   const streamUrl = faceAPI.getCameraStreamUrl();
 
+  // Electron demo mode intentionally uses the device camera directly. It is a
+  // UI/permission check only and does not invoke the CUDA-backed API.
+  useEffect(() => {
+    if (!isDemo) return undefined;
+
+    let cancelled = false;
+
+    const startLocalPreview = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: false,
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        previewStreamRef.current = stream;
+        if (previewRef.current) {
+          previewRef.current.srcObject = stream;
+          await previewRef.current.play();
+        }
+        setIsStreaming(true);
+        setError(null);
+      } catch (cameraError) {
+        console.error('Demo camera preview failed:', cameraError);
+        setError(t('dashboard.demo.cameraError'));
+        setIsStreaming(false);
+      }
+    };
+
+    startLocalPreview();
+
+    return () => {
+      cancelled = true;
+      previewStreamRef.current?.getTracks().forEach((track) => track.stop());
+      previewStreamRef.current = null;
+    };
+  }, [isDemo, t]);
+
   // 컴포넌트 마운트 시 백엔드 카메라 재시작
   useEffect(() => {
+    if (isDemo) return undefined;
+
     const startBackendCamera = async () => {
       try {
         await faceAPI.reopenCamera();
@@ -26,7 +73,7 @@ function Dashboard() {
     };
 
     startBackendCamera();
-  }, []);
+  }, [isDemo]);
 
   // 실시간 통계 업데이트
   useEffect(() => {
@@ -48,7 +95,7 @@ function Dashboard() {
     };
 
     // 스트리밍 중일 때만 통계 업데이트
-    if (isStreaming) {
+    if (isStreaming && !isDemo) {
       // 즉시 한 번 실행
       fetchStats();
 
@@ -61,7 +108,7 @@ function Dashboard() {
         clearInterval(intervalId);
       }
     };
-  }, [isStreaming]);
+  }, [isDemo, isStreaming]);
 
   const handleStreamError = () => {
     setError(t('dashboard.error'));
@@ -122,6 +169,19 @@ function Dashboard() {
                   </button>
                 </div>
               </div>
+            ) : isDemo ? (
+              <>
+                <video
+                  ref={previewRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+                <div className="absolute top-3 left-3 rounded bg-amber-500 px-3 py-1 text-xs font-bold tracking-wide text-white shadow">
+                  {t('dashboard.demo.badge')}
+                </div>
+              </>
             ) : (
               <img
                 src={streamUrl}
@@ -130,6 +190,35 @@ function Dashboard() {
                 onError={handleStreamError}
                 onLoad={handleStreamLoad}
               />
+            )}
+            {isStreaming && !error && stats.recognized_faces.length > 0 && (
+              <div
+                data-testid="face-info-overlay"
+                className="absolute inset-x-0 bottom-0 h-1/5 flex items-center gap-2 sm:gap-4 bg-black/50 px-2 sm:px-4 text-white"
+              >
+                <h3 className="shrink-0 text-[10px] sm:text-sm font-semibold">
+                  {t('dashboard.faceInfo.title')}
+                </h3>
+                <div className="flex h-full min-w-0 flex-1 items-center gap-2 sm:gap-3 overflow-x-auto">
+                  {stats.recognized_faces.map((face, index) => (
+                    <div
+                      key={index}
+                      className={`flex shrink-0 items-center gap-2 border-l-2 pl-2 sm:pl-3 ${
+                        face.name === 'Unknown' ? 'border-red-400' : 'border-green-400'
+                      }`}
+                    >
+                      <span className="text-xs sm:text-xl font-bold">
+                        {face.name === 'Unknown' ? t('dashboard.faceInfo.unknown') : face.name}
+                      </span>
+                      {face.confidence != null && (
+                        <span className="text-[10px] sm:text-sm text-white/80">
+                          {Math.round(face.confidence * 100)}%
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -215,41 +304,10 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 인식된 얼굴 정보 패널 (모바일에서 큰 글씨로 표시) */}
-      {isStreaming && stats.recognized_faces.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3">
-            {t('dashboard.faceInfo.title')}
-          </h3>
-          <div className="space-y-3">
-            {stats.recognized_faces.map((face, index) => (
-              <div
-                key={index}
-                className={`rounded-lg p-3 sm:p-4 border-l-4 ${
-                  face.name === 'Unknown'
-                    ? 'bg-red-50 border-red-500'
-                    : 'bg-green-50 border-green-500'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`text-xl sm:text-2xl font-bold ${
-                    face.name === 'Unknown' ? 'text-red-700' : 'text-green-700'
-                  }`}>
-                    {face.name === 'Unknown' ? t('dashboard.faceInfo.unknown') : face.name}
-                  </span>
-                  {face.confidence && (
-                    <span className="text-sm sm:text-base font-medium text-gray-500">
-                      {Math.round(face.confidence * 100)}%
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-3 mt-1 text-base sm:text-lg text-gray-600">
-                  {face.gender && <span>{face.gender}</span>}
-                  {face.age && <span>{t('dashboard.faceInfo.age', { age: face.age })}</span>}
-                </div>
-              </div>
-            ))}
-          </div>
+      {isDemo && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4 text-sm text-amber-900">
+          <span className="font-semibold">{t('dashboard.demo.title')}</span>{' '}
+          {t('dashboard.demo.description')}
         </div>
       )}
 

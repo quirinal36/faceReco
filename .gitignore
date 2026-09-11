@@ -27,6 +27,8 @@ MANIFEST
 venv/
 env/
 ENV/
+.venv311/
+.venv312/
 env.bak/
 venv.bak/
 
@@ -88,3 +90,8 @@ node_modules/
 
 frontend/playwright-report/**
 frontend/test-results/**
+.venv/**
+
+# Local captures and generated code analysis
+/captures/
+/graphify-out/
