@@ -23,8 +23,7 @@ function Attendance() {
     try {
       const response = await faceAPI.getAttendanceByDate(selectedDate);
       setRecords(response.data.records || []);
-    } catch (error) {
-      console.error('출석 조회 실패:', error.message);
+    } catch {
       setRecords([]);
     } finally {
       setLoading(false);
@@ -36,8 +35,8 @@ function Attendance() {
     try {
       const response = await faceAPI.getFaces();
       setTotalRegistered(response.data.total || 0);
-    } catch (error) {
-      console.error('등록 인원 조회 실패:', error.message);
+    } catch {
+      // The daily view remains usable with a zero registered count.
     }
   }, []);
 
@@ -52,8 +51,7 @@ function Attendance() {
 
       const response = await faceAPI.getAttendanceStats(startDate, endDate);
       setStats(response.data);
-    } catch (error) {
-      console.error('통계 조회 실패:', error.message);
+    } catch {
       setStats(null);
     }
   }, [statsMode, todayStr]);

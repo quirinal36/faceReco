@@ -3,6 +3,23 @@
     "title": "얼굴 인식 시스템",
     "loading": "로딩 중..."
   },
+  "auth": {
+    "title": "로컬 접근 인증",
+    "description": "관리자에게 받은 운영자 또는 기기 인증 정보를 입력하세요.",
+    "credential": "접근 인증 정보",
+    "validating": "확인 중...",
+    "signIn": "계속",
+    "signOut": "로그아웃",
+    "sessionNotice": "인증 정보는 현재 브라우저 세션에만 보관되며 로그아웃하면 삭제됩니다.",
+    "errors": {
+      "invalid": "인증 정보가 올바르지 않습니다.",
+      "unavailable": "로컬 서비스에서 인증 정보를 확인할 수 없습니다. 다시 시도해주세요."
+    },
+    "roles": {
+      "operator": "운영자",
+      "device": "기기"
+    }
+  },
   "nav": {
     "dashboard": "대시보드",
     "register": "얼굴 등록",

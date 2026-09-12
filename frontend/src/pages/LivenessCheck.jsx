@@ -41,9 +41,6 @@ function LivenessCheck() {
   // 카메라 시작
   const startCamera = async () => {
     try {
-      // 백엔드 카메라 해제
-      await faceAPI.releaseCamera().catch(() => {});
-
       setCameraActive(true);
       setMessage(t('liveness.messages.startingCamera'));
 
@@ -64,8 +61,7 @@ function LivenessCheck() {
         stream.getTracks().forEach((track) => track.stop());
         setCameraActive(false);
       }
-    } catch (error) {
-      console.error('카메라 접근 오류:', error);
+    } catch {
       setCameraActive(false);
       setMessage(t('liveness.messages.cameraError'));
     }
@@ -114,7 +110,6 @@ function LivenessCheck() {
       setStatus('challenging');
       setMessage(t('liveness.messages.turnHead'));
     } catch (error) {
-      console.error('세션 시작 실패:', error);
       setStatus('failed');
       if (error.response && error.response.status === 429) {
         setMessage(t('liveness.messages.tooManyRetries'));
@@ -201,10 +196,24 @@ function LivenessCheck() {
         setMessage(t('liveness.messages.turnMore'));
       }
     } catch (error) {
-      console.error('Liveness check 오류:', error);
-      if (error.response && error.response.status === 429) {
+      const responseStatus = error.response?.status;
+      if (responseStatus === 429) {
         setStatus('failed');
         setMessage(t('liveness.messages.tooManyRetries'));
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current);
+          checkIntervalRef.current = null;
+        }
+      } else if (responseStatus === 404 || responseStatus === 410) {
+        setStatus('expired');
+        setMessage(t('liveness.messages.expired'));
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current);
+          checkIntervalRef.current = null;
+        }
+      } else if (responseStatus === 409) {
+        setStatus('failed');
+        setMessage(t('liveness.messages.sessionError'));
         if (checkIntervalRef.current) {
           clearInterval(checkIntervalRef.current);
           checkIntervalRef.current = null;
@@ -256,9 +265,6 @@ function LivenessCheck() {
     let animId;
 
     const draw = () => {
-      const w = video.videoWidth || 640;
-      const h = video.videoHeight || 480;
-
       // 비디오 표시 크기에 맞추기
       const rect = video.getBoundingClientRect();
       overlay.width = rect.width;
@@ -360,7 +366,6 @@ function LivenessCheck() {
   useEffect(() => {
     return () => {
       stopCamera();
-      faceAPI.reopenCamera().catch(() => {});
     };
   }, [stopCamera]);
 

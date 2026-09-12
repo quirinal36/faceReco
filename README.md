@@ -26,7 +26,8 @@ A system providing real-time face recognition through camera integration and a w
 - [PRD (Product Requirements)](./PRD.md)
 - [Project Plan](./PROJECT_PLAN.md)
 - [Learning Workbook](./LEARNING_WORKBOOK.md) - Technical learning guide for project managers
-- [API Guide](./API_GUIDE.md) - FastAPI server usage guide
+- [API Guide](./API_GUIDE_EN.md) - Authenticated FastAPI server usage guide
+- [Security & Privacy Operations](./docs/SECURITY.md) - Required deployment, storage, credential, and incident controls
 - [Troubleshooting Guide](./TROUBLESHOOTING.md) - Installation and execution issues
 
 ## Project Structure
@@ -167,7 +168,36 @@ Current Status: **Milestone 5 - Web Dashboard Development In Progress** 🚧
    python test_installation.py
    ```
 
-   **Note**: On first run, InsightFace buffalo_l model will be downloaded automatically (~600MB)
+   **Model provisioning**: Download and verify InsightFace artifacts on a controlled
+   staging/build host, then place the frozen bundle at
+   `$FACERECO_MODEL_ROOT/models/buffalo_l/*.onnx` on the edge (or set an approved
+   `FACERECO_MODEL_NAME` with the matching directory). A production edge must not
+   download models at runtime;
+   see [Security & Privacy Operations](./docs/SECURITY.md#model-artifacts-and-egress).
+
+### Required Local Security Configuration
+
+The server fails closed unless two different random bearer credentials of at
+least 32 characters are configured. For a temporary local development shell:
+
+```bash
+export FACERECO_OPERATOR_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export FACERECO_DEVICE_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+export FACERECO_CORS_ORIGINS="https://127.0.0.1:5173"
+```
+
+Use protected `FACERECO_OPERATOR_TOKEN_FILE` and
+`FACERECO_DEVICE_TOKEN_FILE` settings for a managed service. The credentials
+represent different roles: `operator` performs enrollment, browsing, deletion,
+camera, and attendance management; the one local `device` credential is limited
+to liveness operations. The browser asks for one credential and keeps it only in
+the current tab's session storage after verifying `/api/auth/whoami`.
+
+Never put a bearer token in a URL or a Vite `VITE_*` variable. The checked-in
+[`.env.example`](./.env.example) contains deliberately invalid placeholders and
+is not loaded automatically. Read the [security guide](./docs/SECURITY.md) before
+provisioning persistent credentials, enabling LAN/VPN access, or running in
+production.
 
 ### Running the Application
 
@@ -192,9 +222,14 @@ start-dev.bat
 ```
 
 After server starts:
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Frontend**: https://127.0.0.1:5173
+- **Backend API**: http://127.0.0.1:8000
+- **API Docs (development only)**: http://127.0.0.1:8000/docs
+
+The API binds to loopback by default. Never publish it to the internet or use
+`0.0.0.0`. A specific trusted development LAN/VPN address requires the explicit
+non-loopback opt-in described in the security guide; production remains
+loopback-only and interacts with Edu Manager through outbound HTTPS only.
 
 ---
 
@@ -244,19 +279,22 @@ python server.py
 ```
 
 After server starts:
-- **API Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/api/health
+- **API Docs (development only)**: http://127.0.0.1:8000/docs
+- **ReDoc (development only)**: http://127.0.0.1:8000/redoc
+- **Health Check**: http://127.0.0.1:8000/api/health
 
 **API Endpoints**:
 - `POST /api/face/register` - Register face
 - `GET /api/faces/list` - List registered faces
+- `GET /api/faces/{id}/thumbnail` - Fetch an operator-authorized thumbnail
 - `DELETE /api/face/{id}` - Delete face
 - `GET /api/camera/stream` - Real-time video streaming
 - `GET /api/camera/stats` - Real-time statistics
-- `POST /api/faces/merge/{name}` - Merge duplicate faces
+- `POST /api/faces/merge` - Merge duplicate faces
 
-For detailed usage, see [API Guide](./API_GUIDE.md).
+Except for the minimal health check, API requests require an operator or device
+`Authorization: Bearer ...` header. For detailed role and request examples, see
+the [API Guide](./API_GUIDE_EN.md).
 
 #### 6. Individual Module Execution
 ```bash
@@ -365,11 +403,15 @@ View and manage all registered faces with options for deletion and duplicate det
 
 ### 1. Initial Setup
 1. Clone the repository and install dependencies (see [Installation](#installation))
-2. Start both backend and frontend servers:
+2. Provision the two bearer roles in
+   [Required Local Security Configuration](#required-local-security-configuration).
+3. Start both backend and frontend servers:
    ```bash
    npm run dev
    ```
-3. Access the web dashboard at http://localhost:5173
+4. Access the web dashboard at https://127.0.0.1:5173 and enter the appropriate
+   operator or device credential when prompted. The credential remains in the
+   current browser tab's session only.
 
 ### 2. Registering Faces
 1. Navigate to **Face Registration** page from the sidebar
@@ -411,9 +453,11 @@ npm test
 
 ### 6. API Integration
 For developers integrating with the backend API:
-- **API Documentation**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- See [API Guide](./API_GUIDE.md) for detailed endpoint documentation
+- **Development API Documentation**: http://127.0.0.1:8000/docs
+- **Development ReDoc**: http://127.0.0.1:8000/redoc
+- Send bearer credentials only in the `Authorization` header; never use a URL
+  query token.
+- See [API Guide](./API_GUIDE_EN.md) for role-aware endpoint documentation.
 
 ## License
 TBD

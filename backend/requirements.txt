@@ -1,3 +1,7 @@
+httpx==0.28.1
+fastapi==0.128.2
+uvicorn==0.40.0
+python-multipart==0.0.22
 albucore==0.0.24
 albumentations==2.0.8
 annotated-types==0.7.0
@@ -24,7 +28,10 @@ mpmath==1.3.0
 networkx==3.4.2
 numpy==2.2.6
 onnx==1.20.1
-onnxruntime==1.23.2
+# Install the CUDA-enabled build appropriate for the local GPU/JetPack image.
+# It must expose CUDAExecutionProvider; CPU-only onnxruntime is intentionally
+# rejected by backend/models/face_recognition.py.
+onnxruntime-gpu==1.30.0
 opencv-python==4.10.0.84
 packaging==26.0
 pillow==12.1.0

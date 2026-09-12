@@ -3,6 +3,23 @@
     "title": "Face Recognition System",
     "loading": "Loading..."
   },
+  "auth": {
+    "title": "Local access required",
+    "description": "Enter the operator or device credential provided by your administrator.",
+    "credential": "Access credential",
+    "validating": "Verifying...",
+    "signIn": "Continue",
+    "signOut": "Sign out",
+    "sessionNotice": "The credential is kept only for this browser session and is cleared when you sign out.",
+    "errors": {
+      "invalid": "That credential is not valid.",
+      "unavailable": "The local service could not verify the credential. Please try again."
+    },
+    "roles": {
+      "operator": "Operator",
+      "device": "Device"
+    }
+  },
   "nav": {
     "dashboard": "Dashboard",
     "register": "Face Registration",

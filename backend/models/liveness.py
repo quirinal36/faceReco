@@ -80,6 +80,7 @@ class LivenessSession:
     """Liveness 검증 세션"""
     session_id: str
     challenges: List[Challenge]
+    owner_id: Optional[str] = None
     current_challenge_index: int = 0
     status: SessionStatus = SessionStatus.ACTIVE
     created_at: float = field(default_factory=time.time)
@@ -218,6 +219,7 @@ class LivenessDetector:
         session = LivenessSession(
             session_id=session_id,
             challenges=challenges,
+            owner_id=client_id,
             timeout=self.session_timeout,
         )
 
@@ -228,9 +230,15 @@ class LivenessDetector:
         self._sessions[session_id] = session
         return session, None
 
-    def get_session(self, session_id: str) -> Optional[LivenessSession]:
+    def get_session(
+        self,
+        session_id: str,
+        owner_id: Optional[str] = None,
+    ) -> Optional[LivenessSession]:
         """세션 조회"""
         session = self._sessions.get(session_id)
+        if session and owner_id is not None and session.owner_id != owner_id:
+            return None
         if session and session.is_expired():
             session.status = SessionStatus.EXPIRED
             for c in session.challenges:
@@ -394,6 +402,7 @@ class LivenessDetector:
         face_id: Optional[str] = None,
         face_name: Optional[str] = None,
         face_confidence: Optional[float] = None,
+        owner_id: Optional[str] = None,
     ) -> Dict:
         """
         Head Pose를 검증하여 현재 챌린지 통과 여부를 판정
@@ -415,7 +424,7 @@ class LivenessDetector:
         Returns:
             Dict: 검증 결과
         """
-        session = self.get_session(session_id)
+        session = self.get_session(session_id, owner_id=owner_id)
         if session is None:
             return {
                 "challenge_passed": False,
@@ -627,11 +636,15 @@ class LivenessDetector:
             for sid, _ in sorted_sessions[:len(self._sessions) - self.max_sessions]:
                 del self._sessions[sid]
 
-    def get_session_info(self, session_id: str) -> Optional[Dict]:
+    def get_session_info(
+        self,
+        session_id: str,
+        owner_id: Optional[str] = None,
+    ) -> Optional[Dict]:
         """
         세션 상태 정보를 딕셔너리로 반환 (API 응답용)
         """
-        session = self.get_session(session_id)
+        session = self.get_session(session_id, owner_id=owner_id)
         if session is None:
             return None
 
@@ -649,6 +662,7 @@ class LivenessDetector:
                 info["last_measured_pitch"] = round(c.last_measured_pitch, 1)
             challenges_info.append(info)
 
+        completed = session.status == SessionStatus.COMPLETED
         return {
             "session_id": session.session_id,
             "status": session.status.value,
@@ -658,8 +672,8 @@ class LivenessDetector:
             "challenges": challenges_info,
             "timeout": session.timeout,
             "elapsed": round(time.time() - session.created_at, 1),
-            "face_id": session.face_id,
-            "face_name": session.face_name,
+            "face_id": session.face_id if completed else None,
+            "face_name": session.face_name if completed else None,
             "motion_score": round(session.motion_score, 2),
             "face_id_consistent": session.face_id_consistent,
         }

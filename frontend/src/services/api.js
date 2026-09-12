@@ -1,140 +1,112 @@
 import axios from 'axios';
+import { clearAuth, getStoredToken } from '../auth/session';
 
-// API 기본 URL (백엔드 서버 주소)
-// Vite 프록시를 통해 같은 오리진으로 요청 (외부 접속 시에도 포트 하나로 동작)
-// 직접 백엔드에 접속해야 할 경우 VITE_API_URL 환경변수로 지정
+// The URL is public configuration only. Credentials are always supplied at runtime.
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
-// Axios 인스턴스 생성
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
-// 요청 인터셉터
-api.interceptors.request.use(
-  (config) => {
-    // 여기에 토큰이나 다른 헤더를 추가할 수 있습니다
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+api.interceptors.request.use((config) => {
+  const token = getStoredToken();
 
-// 응답 인터셉터
+  if (token && !config.headers.has('Authorization')) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  return config;
+});
+
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    // 에러 처리
-    if (error.response) {
-      // 서버가 응답을 반환했지만 상태 코드가 2xx가 아닌 경우
-      console.error('Error response:', error.response.data);
-    } else if (error.request) {
-      // 요청이 전송되었지만 응답을 받지 못한 경우
-      console.error('No response received:', error.request);
-    } else {
-      // 요청 설정 중에 오류가 발생한 경우
-      console.error('Error setting up request:', error.message);
+    if (error?.response?.status === 401) {
+      clearAuth();
     }
     return Promise.reject(error);
-  }
+  },
 );
 
-// API base URL getter (다른 컴포넌트에서 이미지 URL 등에 사용)
-export const getApiBaseUrl = () => API_BASE_URL;
+export const getHttpStatus = (error) => error?.response?.status ?? null;
 
-// API 함수들
+export const getApiUrl = (path) => {
+  if (!API_BASE_URL) return path;
+  return `${API_BASE_URL.replace(/\/$/, '')}${path}`;
+};
+
+export const authAPI = {
+  whoami: (token) => api.get('/api/auth/whoami', {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+};
+
+export const eduAPI = {
+  getStudents: (query = '') => api.get('/api/edu/students', { params: query ? { q: query } : {} }),
+  getEnrollments: (month) => api.get('/api/edu/enrollments', { params: { month } }),
+};
+
 export const faceAPI = {
-  // 얼굴 목록 조회
   getFaces: () => api.get('/api/faces/list'),
 
-  // 얼굴 등록
-  registerFace: (formData) => api.post('/api/face/register', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  }),
+  getFaceThumbnail: (faceId, signal) => api.get(
+    `/api/faces/${encodeURIComponent(faceId)}/thumbnail`,
+    { responseType: 'blob', signal },
+  ),
 
-  // 얼굴 삭제
-  deleteFace: (id) => api.delete(`/api/face/${id}`),
+  registerFace: (formData) => api.post('/api/face/register', formData),
 
-  // 추가 샘플 등록 (같은 사람의 다른 사진)
-  addFaceSample: (faceId, formData) => api.post(`/api/face/${faceId}/add-sample`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  }),
+  deleteFace: (id) => api.delete(`/api/face/${encodeURIComponent(id)}`),
 
-  // 같은 이름을 가진 얼굴 통합
-  mergeFacesByName: (name) => api.post(`/api/faces/merge/${encodeURIComponent(name)}`),
+  addFaceSample: (faceId, formData) => api.post(
+    `/api/face/${encodeURIComponent(faceId)}/add-sample`,
+    formData,
+  ),
 
-  // 얼굴 인식
-  recognizeFace: (formData) => api.post('/api/face/recognize', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  }),
+  mergeFacesByName: (name) => api.post('/api/faces/merge', { name }),
 
-  // 카메라 스트림 URL
-  getCameraStreamUrl: () => `${API_BASE_URL}/api/camera/stream`,
-
-  // 카메라 통계
   getCameraStats: () => api.get('/api/camera/stats'),
 
-  // 카메라 해제 (얼굴 등록 시 프론트엔드 카메라 사용을 위해)
   releaseCamera: () => api.post('/api/camera/release'),
 
-  // 카메라 재시작 (대시보드로 돌아올 때)
   reopenCamera: () => api.post('/api/camera/reopen'),
 
-  // ==================== 출석 API ====================
-
-  // 오늘 출석 현황
   getAttendanceToday: () => api.get('/api/attendance/today'),
 
-  // 특정 날짜 출석 조회
   getAttendanceByDate: (date) => api.get(`/api/attendance/date/${date}`),
 
-  // 기간별 출석 조회
-  getAttendanceRange: (startDate, endDate) =>
-    api.get('/api/attendance/range', { params: { start_date: startDate, end_date: endDate } }),
+  getAttendanceRange: (startDate, endDate) => api.get('/api/attendance/range', {
+    params: { start_date: startDate, end_date: endDate },
+  }),
 
-  // 특정 인물 출석 이력
-  getAttendanceByPerson: (name, startDate, endDate) =>
-    api.get(`/api/attendance/person/${encodeURIComponent(name)}`, {
-      params: { start_date: startDate, end_date: endDate }
-    }),
+  getAttendanceByPerson: (name, startDate, endDate) => api.post(
+    '/api/attendance/person/search',
+    {
+      name,
+      start_date: startDate || null,
+      end_date: endDate || null,
+    },
+  ),
 
-  // 출석 통계
-  getAttendanceStats: (startDate, endDate) =>
-    api.get('/api/attendance/stats', { params: { start_date: startDate, end_date: endDate } }),
+  getAttendanceStats: (startDate, endDate) => api.get('/api/attendance/stats', {
+    params: { start_date: startDate, end_date: endDate },
+  }),
 
-  // 출석 기록 삭제
-  deleteAttendance: (id) => api.delete(`/api/attendance/${id}`),
+  deleteAttendance: (id) => api.delete(`/api/attendance/${encodeURIComponent(id)}`),
 
-  // ==================== Liveness Detection API ====================
-
-  // Liveness 세션 시작
   startLivenessSession: () => api.post('/api/liveness/start'),
 
-  // Liveness 검증 (프레임 전송)
   checkLiveness: (sessionId, imageBlob) => {
     const formData = new FormData();
     formData.append('session_id', sessionId);
     formData.append('file', imageBlob, 'frame.jpg');
-    return api.post('/api/liveness/check', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return api.post('/api/liveness/check', formData);
   },
 
-  // Liveness 세션 상태 조회
-  getLivenessStatus: (sessionId) => api.get(`/api/liveness/status/${sessionId}`),
+  getLivenessStatus: (sessionId) => api.post('/api/liveness/status', {
+    session_id: sessionId,
+  }),
 };
 
 export default api;

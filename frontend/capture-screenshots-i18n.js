@@ -1,142 +1,66 @@
-/**
- * Playwright Screenshot Capture Script with i18n Support
- *
- * This script captures screenshots of all pages in both English and Korean
- * for documentation purposes.
- */
-
 import { chromium } from '@playwright/test';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { installSyntheticApi, installSyntheticSession } from './synthetic-screenshot-fixtures.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Configuration
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = 'https://127.0.0.1:5173';
 const SCREENSHOTS_DIR = join(__dirname, '..', 'docs', 'screenshots');
 const VIEWPORT = { width: 1920, height: 1080 };
 
-// Language configurations
 const languages = [
-  {
-    code: 'en',
-    name: 'English',
-    dir: 'en',
-    localStorage: { 'i18nextLng': 'en' }
-  },
-  {
-    code: 'kr',
-    name: 'Korean',
-    dir: 'kr',
-    localStorage: { 'i18nextLng': 'kr' }
-  }
+  { code: 'en', locale: 'en-US', dir: 'en' },
+  { code: 'ko', locale: 'ko-KR', dir: 'kr' },
 ];
 
-// Page configurations
 const pages = [
-  {
-    name: 'dashboard',
-    path: '/',
-    filename: '01-dashboard.png',
-    description: 'Dashboard - Real-time face monitoring'
-  },
-  {
-    name: 'face-registration',
-    path: '/face-registration',
-    filename: '02-face-registration.png',
-    description: 'Face Registration - Add new faces'
-  },
-  {
-    name: 'face-list',
-    path: '/face-list',
-    filename: '03-face-list.png',
-    description: 'Face List - Manage registered faces'
-  }
+  { path: '/', filename: '01-dashboard.png' },
+  { path: '/register', filename: '02-face-registration.png' },
+  { path: '/faces', filename: '03-face-list.png' },
 ];
 
 async function captureScreenshots() {
-  console.log('🚀 Starting i18n screenshot capture...\n');
+  if (process.env.FACERECO_SYNTHETIC_DOCS !== '1') {
+    console.error('Refusing screenshot capture: set FACERECO_SYNTHETIC_DOCS=1 to use synthetic data only.');
+    process.exitCode = 1;
+    return;
+  }
 
-  // Launch browser
   const browser = await chromium.launch({ headless: true });
-
   try {
     for (const language of languages) {
-      console.log(`\n📸 Capturing screenshots for: ${language.name} (${language.code})`);
-      console.log('='.repeat(60));
+      const languageDir = join(SCREENSHOTS_DIR, language.dir);
+      if (!existsSync(languageDir)) mkdirSync(languageDir, { recursive: true });
 
-      // Create language-specific directory
-      const langDir = join(SCREENSHOTS_DIR, language.dir);
-      if (!existsSync(langDir)) {
-        mkdirSync(langDir, { recursive: true });
-        console.log(`📁 Created directory: ${langDir}`);
-      }
-
-      // Create context with language set
       const context = await browser.newContext({
         viewport: VIEWPORT,
         deviceScaleFactor: 1,
-        locale: language.code === 'kr' ? 'ko-KR' : 'en-US'
+        locale: language.locale,
+        ignoreHTTPSErrors: true,
       });
-
       const page = await context.newPage();
+      await installSyntheticSession(page, language.code);
+      await installSyntheticApi(page);
 
-      // Set localStorage for i18next
-      await page.goto(BASE_URL);
-      await page.evaluate((storage) => {
-        for (const [key, value] of Object.entries(storage)) {
-          localStorage.setItem(key, value);
-        }
-      }, language.localStorage);
-
-      // Capture screenshots for each page
       for (const pageConfig of pages) {
-        const url = `${BASE_URL}${pageConfig.path}`;
-        console.log(`\n   📷 ${pageConfig.description}`);
-        console.log(`      URL: ${url}`);
-
-        await page.goto(url, { waitUntil: 'networkidle' });
-
-        // Wait for content to load and language to be applied
-        await page.waitForTimeout(2000);
-
-        const screenshotPath = join(langDir, pageConfig.filename);
+        await page.goto(`${BASE_URL}${pageConfig.path}`, { waitUntil: 'networkidle' });
         await page.screenshot({
-          path: screenshotPath,
-          fullPage: false
+          path: join(languageDir, pageConfig.filename),
+          fullPage: false,
         });
-
-        console.log(`      ✅ Saved: ${language.dir}/${pageConfig.filename}`);
       }
 
       await context.close();
-      console.log(`\n✨ Completed ${language.name} screenshots!`);
+      console.log(`Synthetic ${language.code} screenshots captured.`);
     }
-
-    console.log('\n' + '='.repeat(60));
-    console.log('✨ All screenshots captured successfully!');
-    console.log(`📂 Screenshots saved in:`);
-    for (const language of languages) {
-      console.log(`   - ${join(SCREENSHOTS_DIR, language.dir)}`);
-    }
-
-  } catch (error) {
-    console.error('\n❌ Error capturing screenshots:', error.message);
-    throw error;
   } finally {
     await browser.close();
   }
 }
 
-// Run the script
-captureScreenshots()
-  .then(() => {
-    console.log('\n🎉 Screenshot capture completed!');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('\n💥 Failed to capture screenshots:', error);
-    process.exit(1);
-  });
+captureScreenshots().catch(() => {
+  console.error('Synthetic i18n screenshot capture failed.');
+  process.exitCode = 1;
+});

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import AuthenticatedMjpeg from '../components/AuthenticatedMjpeg';
 import { faceAPI } from '../services/api';
 
 function Dashboard() {
@@ -15,7 +16,6 @@ function Dashboard() {
     fps: 0,
     recognized_faces: []
   });
-  const streamUrl = faceAPI.getCameraStreamUrl();
 
   // Electron demo mode intentionally uses the device camera directly. It is a
   // UI/permission check only and does not invoke the CUDA-backed API.
@@ -66,9 +66,8 @@ function Dashboard() {
     const startBackendCamera = async () => {
       try {
         await faceAPI.reopenCamera();
-        console.log('백엔드 카메라가 시작되었습니다.');
-      } catch (error) {
-        console.warn('백엔드 카메라 시작 실패:', error.message);
+      } catch {
+        // Stream startup reports camera availability to the user.
       }
     };
 
@@ -88,9 +87,8 @@ function Dashboard() {
           fps: response.data.fps,
           recognized_faces: response.data.recognized_faces || []
         });
-      } catch (error) {
-        // 통계 가져오기 실패 시 무시 (스트림이 시작되지 않았을 수 있음)
-        console.debug('Stats fetch failed:', error.message);
+      } catch {
+        // A transient stats failure does not interrupt the camera stream.
       }
     };
 
@@ -115,7 +113,7 @@ function Dashboard() {
     setIsStreaming(false);
   };
 
-  const handleStreamLoad = () => {
+  const handleStreamFrame = () => {
     setIsStreaming(true);
     setError(null);
   };
@@ -183,12 +181,11 @@ function Dashboard() {
                 </div>
               </>
             ) : (
-              <img
-                src={streamUrl}
+              <AuthenticatedMjpeg
                 alt="Camera Stream"
                 className="w-full h-full object-contain"
                 onError={handleStreamError}
-                onLoad={handleStreamLoad}
+                onFrame={handleStreamFrame}
               />
             )}
             {isStreaming && !error && stats.recognized_faces.length > 0 && (

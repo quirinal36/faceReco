@@ -239,25 +239,27 @@ pip install onnxruntime==1.16.0
 
 ---
 
-### Issue: Model Download Failure
+### Issue: Provisioned Model Artifacts Are Missing
 
 **Symptom**:
 ```
-RuntimeError: Failed to download model: buffalo_l
+RuntimeError: InsightFace model could not be loaded
 ```
 
-**Cause**: Internet connection issues or firewall
+**Cause**: The approved model bundle was not provisioned, is incomplete, or does
+not match `$FACERECO_MODEL_ROOT/models/$FACERECO_MODEL_NAME/`.
 
 **Solution**:
-1. Check network connection
-2. Configure proxy (if needed)
-   ```bash
-   export HTTP_PROXY=http://proxy:port
-   export HTTPS_PROXY=http://proxy:port
-   ```
-3. Manual download:
-   - [InsightFace Model Zoo](https://github.com/deepinsight/insightface/tree/master/model_zoo)
-   - Save to `~/.insightface/models/` directory
+1. Do not enable general internet or proxy access on a production edge.
+2. On a controlled staging/build host, obtain the approved InsightFace version,
+   verify it against the release checksum manifest, and scan the artifacts.
+3. Transfer the frozen bundle to the edge's encrypted storage. The default layout
+   is `$FACERECO_MODEL_ROOT/models/buffalo_l/*.onnx`; an approved alternative must
+   set `FACERECO_MODEL_NAME` and use the matching directory.
+4. Confirm the service account can read the artifacts, then restart. A production
+   edge must not download a model at runtime.
+
+See [Security & Privacy Operations](./docs/SECURITY.md#model-artifacts-and-egress).
 
 ---
 

@@ -14,20 +14,23 @@ class TestFaceRecognizer:
     """얼굴 인식기 테스트"""
 
     @pytest.fixture(autouse=True)
-    def skip_if_no_insightface(self):
-        """InsightFace가 설치되지 않은 경우 테스트 건너뛰기"""
+    def skip_if_no_cuda_inference_runtime(self):
+        """CUDA inference is an explicit runtime requirement for this backend."""
         try:
             import insightface
+            import onnxruntime as ort
         except ImportError:
-            pytest.skip("InsightFace가 설치되지 않았습니다")
+            pytest.skip("InsightFace or ONNX Runtime is not installed")
+        if 'CUDAExecutionProvider' not in ort.get_available_providers():
+            pytest.skip("CUDAExecutionProvider is not available")
 
     def test_initialization(self):
         """얼굴 인식기 초기화 테스트"""
         from backend.models.face_recognition import FaceRecognizer
 
-        recognizer = FaceRecognizer(device='cpu')
+        recognizer = FaceRecognizer(device='cuda')
         assert recognizer is not None
-        assert recognizer.device == 'cpu'
+        assert recognizer.device == 'cuda'
         assert recognizer.model_name == 'buffalo_l'
         assert recognizer.embedding_size == 512
 
@@ -35,7 +38,7 @@ class TestFaceRecognizer:
         """모델 정보 조회 테스트"""
         from backend.models.face_recognition import FaceRecognizer
 
-        recognizer = FaceRecognizer(device='cpu')
+        recognizer = FaceRecognizer(device='cuda')
         info = recognizer.get_model_info()
 
         assert 'model_name' in info
