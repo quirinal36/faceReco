@@ -10,8 +10,11 @@ from typing import List, Optional
 from pydantic import BaseModel
 import cv2
 import numpy as np
+import io
 import logging
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date, timedelta
 from utils.text_utils import put_korean_text, get_text_size
 
@@ -269,7 +272,11 @@ def get_face_recognizer() -> FaceRecognizer:
     """얼굴 인식기 의존성"""
     global _face_recognizer
     if _face_recognizer is None:
-        _face_recognizer = FaceRecognizer()
+        try:
+            _face_recognizer = FaceRecognizer()
+        except Exception as exc:
+            _face_recognizer = None
+            print(f"FaceRecognizer 초기화 실패: {exc}")
     return _face_recognizer
 
 
@@ -277,7 +284,11 @@ def get_face_database() -> FaceDatabase:
     """얼굴 데이터베이스 의존성"""
     global _face_database
     if _face_database is None:
-        _face_database = FaceDatabase()
+        try:
+            _face_database = FaceDatabase()
+        except Exception as exc:
+            _face_database = None
+            print(f"FaceDatabase 초기화 실패: {exc}")
     return _face_database
 
 
@@ -857,124 +868,123 @@ def _format_age_gender(age, gender) -> str:
     return ", ".join(parts)
 
 
+def _analyze_camera_frame(recognizer, database, frame):
+    results = recognizer.detect_and_extract(frame)
+    # 통계 업데이트
+    overlays = []
+    recognized_count = 0
+    current_faces = []
+
+    for face_result in results:
+        bbox = face_result['bbox']
+        embedding = face_result['embedding']
+        age = face_result.get('age')
+        gender = face_result.get('gender')
+        x1, y1, x2, y2 = bbox
+
+        # 데이터베이스에서 매칭
+        match = database.recognize_face(embedding)
+
+        if match:
+            recognized_count += 1
+            face_id, confidence = match
+            face_data = database.faces.get(face_id)
+            name = face_data['metadata'].get('name', 'Unknown') if face_data else 'Unknown'
+
+            # 출석 기록 처리
+            _record_attendance_if_needed(face_id, name, confidence)
+
+            # 녹색 박스 (인식됨)
+            color = (0, 255, 0)
+            label = f"{name} ({confidence:.2f})"
+        else:
+            # 빨간색 박스 (미등록)
+            color = (0, 0, 255)
+            label = "Unknown"
+            name = "Unknown"
+            confidence = None
+
+        # 프론트엔드 표시용 얼굴 정보 수집
+        gender_str = None
+        if gender is not None:
+            gender_str = "남성" if gender == 1 else "여성"
+        current_faces.append({
+            'name': name,
+            'confidence': round(confidence, 2) if confidence is not None else None,
+            'age': int(age) if age is not None else None,
+            'gender': gender_str,
+        })
+
+        overlays.append((bbox, color, label))
+    return overlays, current_faces, recognized_count
+
+
 def generate_frames(
     recognizer: FaceRecognizer,
     database: FaceDatabase,
     camera: CameraHandler
 ):
+    """Send live frames while one background inference processes a copied frame.
+
+    No inference queue: when busy, skip analysis of incoming frames. Old boxes
+    expire to avoid labelling a different person after somebody moves away.
     """
-    실시간 비디오 스트림 생성 (제너레이터)
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='face-stream')
+    pending = None
+    overlays = []
+    sampled_at = 0.0
+    overlay_sampled_at = 0.0
+    window_start = time.monotonic()
+    frame_count = 0
+    try:
+        while True:
+            ret, frame = camera.read_frame()
+            if not ret:
+                break
+            now = time.monotonic()
+            if pending is not None and pending.done():
+                try:
+                    overlays, faces, recognized_count = pending.result()
+                    overlay_sampled_at = sampled_at
+                    _camera_stats.update(
+                        faces_detected=len(faces), faces_recognized=recognized_count,
+                        recognized_faces=faces,
+                    )
+                except Exception as exc:
+                    overlays = []
+                    _camera_stats.update(faces_detected=0, faces_recognized=0,
+                                         recognized_faces=[])
+                    print(f'Camera recognition failed: {exc}')
+                pending = None
+            if pending is None:
+                sampled_at = now
+                pending = executor.submit(_analyze_camera_frame, recognizer,
+                                          database, frame.copy())
 
-    MJPEG 형식으로 프레임을 인코딩하여 스트리밍
-    """
-    global _camera_stats
+            if now - overlay_sampled_at <= 1.0:
+                for bbox, color, label in overlays:
+                    x1, y1, x2, y2 = bbox
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+                    text_w, text_h = get_text_size(label, 20)
+                    cv2.rectangle(frame, (x1, y1 - text_h - 10),
+                                  (x1 + text_w + 4, y1), color, -1)
+                    put_korean_text(frame, label, (x1 + 2, y1 - text_h - 6),
+                                    font_size=20, color=(255, 255, 255))
 
-    while True:
-        ret, frame = camera.read_frame()
-
-        if not ret:
-            break
-
-        # 얼굴 감지 및 인식
-        results = recognizer.detect_and_extract(frame)
-
-        # 통계 업데이트
-        _camera_stats['faces_detected'] = len(results)
-        recognized_count = 0
-        current_faces = []
-
-        for face_result in results:
-            bbox = face_result['bbox']
-            embedding = face_result['embedding']
-            age = face_result.get('age')
-            gender = face_result.get('gender')
-            x1, y1, x2, y2 = bbox
-
-            # 데이터베이스에서 매칭
-            match = database.recognize_face(embedding)
-
-            if match:
-                recognized_count += 1
-                face_id, confidence = match
-                face_data = database.faces.get(face_id)
-                name = face_data['metadata'].get('name', 'Unknown') if face_data else 'Unknown'
-
-                # 출석 기록 처리
-                _record_attendance_if_needed(face_id, name, confidence)
-
-                # 녹색 박스 (인식됨)
-                color = (0, 255, 0)
-                label = f"{name} ({confidence:.2f})"
-            else:
-                # 빨간색 박스 (미등록)
-                color = (0, 0, 255)
-                label = "Unknown"
-                name = "Unknown"
-                confidence = None
-
-            # 나이/성별 정보 추가
-            age_gender_str = _format_age_gender(age, gender)
-            if age_gender_str:
-                label = f"{label} {age_gender_str}"
-
-            # 프론트엔드 표시용 얼굴 정보 수집
-            gender_str = None
-            if gender is not None:
-                gender_str = "남성" if gender == 1 else "여성"
-            current_faces.append({
-                'name': name,
-                'confidence': round(confidence, 2) if confidence is not None else None,
-                'age': int(age) if age is not None else None,
-                'gender': gender_str,
-            })
-
-            # 박스 그리기
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-            # 레이블 배경 (Pillow 기반 한글 지원)
-            font_size = 20
-            text_w, text_h = get_text_size(label, font_size)
-
-            cv2.rectangle(
-                frame,
-                (x1, y1 - text_h - 10),
-                (x1 + text_w + 4, y1),
-                color,
-                -1
-            )
-
-            # 레이블 텍스트 (한글 지원)
-            put_korean_text(
-                frame,
-                label,
-                (x1 + 2, y1 - text_h - 6),
-                font_size=font_size,
-                color=(255, 255, 255),
-            )
-
-        # 통계 업데이트 (인식 성공 수 및 얼굴 상세 정보)
-        _camera_stats['faces_recognized'] = recognized_count
-        _camera_stats['recognized_faces'] = current_faces
-
-        # FPS 계산
-        _camera_stats['frame_count'] += 1
-        elapsed = (datetime.now() - _camera_stats['start_time']).total_seconds()
-        if elapsed > 0:
-            _camera_stats['fps'] = _camera_stats['frame_count'] / elapsed
-
-        _camera_stats['last_updated'] = datetime.now().isoformat()
-
-        # JPEG로 인코딩
-        ret, buffer = cv2.imencode('.jpg', frame)
-
-        if not ret:
-            continue
-
-        frame_bytes = buffer.tobytes()
-
-        # MJPEG 형식으로 yield
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+            if not ret:
+                continue
+            frame_count += 1
+            elapsed = time.monotonic() - window_start
+            if elapsed >= 1.0:
+                _camera_stats['fps'] = frame_count / elapsed
+                window_start = time.monotonic()
+                frame_count = 0
+            _camera_stats['last_updated'] = datetime.now().isoformat()
+            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n'
+                   + buffer.tobytes() + b'\r\n')
+    finally:
+        executor.shutdown(wait=False, cancel_futures=True)
 
 
 @router.get(

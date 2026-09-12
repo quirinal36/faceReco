@@ -36,7 +36,7 @@
     "stats": {
       "detected": "감지된 얼굴",
       "recognized": "인식 성공",
-      "fps": "처리 속도"
+      "fps": "영상 속도 (FPS)"
     },
     "error": "카메라 스트림을 불러올 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.",
     "retry": "다시 시도",
@@ -49,6 +49,12 @@
       "title": "감지된 얼굴 정보",
       "unknown": "미등록",
       "age": "{{age}}세"
+    },
+    "demo": {
+      "badge": "DEMO · 로컬 카메라",
+      "title": "데모 모드:",
+      "description": "카메라 권한과 Electron 화면만 확인합니다. 얼굴 감지·인식·등록 API는 CUDA 백엔드 빌드가 끝난 뒤에 활성화됩니다.",
+      "cameraError": "로컬 카메라에 접근할 수 없습니다. 운영체제의 카메라 권한을 확인하세요."
     }
   },
   "registration": {
